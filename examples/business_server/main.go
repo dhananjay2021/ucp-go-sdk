@@ -280,6 +280,10 @@ func handleUpdateCheckout(r *http.Request, id string, req *extensions.ExtendedCh
 }
 
 func handleCompleteCheckout(r *http.Request, id string) (*extensions.ExtendedCheckoutResponse, error) {
+	// Generate order ID before acquiring lock to avoid deadlock
+	orderID := generateID("ord")
+	now := time.Now()
+
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -291,10 +295,6 @@ func handleCompleteCheckout(r *http.Request, id string) (*extensions.ExtendedChe
 	if checkout.Status != models.CheckoutStatusReadyForComplete {
 		return nil, server.BadRequestError("checkout is not ready for completion")
 	}
-
-	// Create order
-	orderID := generateID("ord")
-	now := time.Now()
 
 	orderLineItems := make([]models.OrderLineItem, len(checkout.LineItems))
 	for i, li := range checkout.LineItems {
