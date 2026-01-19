@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <b>Official Go library for the Universal Commerce Protocol (UCP).</b>
+  <b>Go SDK for the Universal Commerce Protocol (UCP).</b>
 </p>
 
 ## Overview
