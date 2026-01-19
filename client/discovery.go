@@ -15,7 +15,7 @@
 package client
 
 import (
-	"github.com/Universal-Commerce-Protocol/go-sdk/models"
+	"github.com/dhananjay2021/ucp-go-sdk/models"
 )
 
 // HasCapability checks if the profile supports a given capability name.

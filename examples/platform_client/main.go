@@ -28,9 +28,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/Universal-Commerce-Protocol/go-sdk/client"
-	"github.com/Universal-Commerce-Protocol/go-sdk/extensions"
-	"github.com/Universal-Commerce-Protocol/go-sdk/models"
+	"github.com/dhananjay2021/ucp-go-sdk/client"
+	"github.com/dhananjay2021/ucp-go-sdk/extensions"
+	"github.com/dhananjay2021/ucp-go-sdk/models"
 )
 
 func main() {

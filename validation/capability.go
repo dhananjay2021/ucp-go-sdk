@@ -19,7 +19,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Universal-Commerce-Protocol/go-sdk/models"
+	"github.com/dhananjay2021/ucp-go-sdk/models"
 )
 
 // CapabilityNegotiator handles capability negotiation between platform and business.

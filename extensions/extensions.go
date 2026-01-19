@@ -18,7 +18,7 @@ package extensions
 import (
 	"time"
 
-	"github.com/Universal-Commerce-Protocol/go-sdk/models"
+	"github.com/dhananjay2021/ucp-go-sdk/models"
 )
 
 // ExtendedPaymentCredential extends PaymentCredential with an optional token field.

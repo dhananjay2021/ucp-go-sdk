@@ -28,7 +28,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Universal-Commerce-Protocol/go-sdk/models"
+	"github.com/dhananjay2021/ucp-go-sdk/models"
 )
 
 // WebhookVerifier verifies webhook signatures.

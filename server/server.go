@@ -19,8 +19,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/Universal-Commerce-Protocol/go-sdk/extensions"
-	"github.com/Universal-Commerce-Protocol/go-sdk/models"
+	"github.com/dhananjay2021/ucp-go-sdk/extensions"
+	"github.com/dhananjay2021/ucp-go-sdk/models"
 )
 
 // Config contains server configuration.

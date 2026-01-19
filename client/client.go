@@ -25,8 +25,8 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/Universal-Commerce-Protocol/go-sdk/extensions"
-	"github.com/Universal-Commerce-Protocol/go-sdk/models"
+	"github.com/dhananjay2021/ucp-go-sdk/extensions"
+	"github.com/dhananjay2021/ucp-go-sdk/models"
 )
 
 const (

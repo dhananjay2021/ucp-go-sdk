@@ -1,3 +1,3 @@
-module github.com/Universal-Commerce-Protocol/go-sdk
+module github.com/dhananjay2021/ucp-go-sdk
 
 go 1.22

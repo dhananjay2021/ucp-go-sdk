@@ -39,7 +39,7 @@ validation, and client/server utilities for building UCP-compliant applications.
 ## Installation
 
 ```bash
-go get github.com/Universal-Commerce-Protocol/go-sdk
+go get github.com/dhananjay2021/ucp-go-sdk
 ```
 
 ## Quick Start
@@ -55,9 +55,9 @@ import (
     "context"
     "log"
 
-    "github.com/Universal-Commerce-Protocol/go-sdk/client"
-    "github.com/Universal-Commerce-Protocol/go-sdk/extensions"
-    "github.com/Universal-Commerce-Protocol/go-sdk/models"
+    "github.com/dhananjay2021/ucp-go-sdk/client"
+    "github.com/dhananjay2021/ucp-go-sdk/extensions"
+    "github.com/dhananjay2021/ucp-go-sdk/models"
 )
 
 func main() {
@@ -112,10 +112,10 @@ import (
     "log"
     "net/http"
 
-    "github.com/Universal-Commerce-Protocol/go-sdk/client"
-    "github.com/Universal-Commerce-Protocol/go-sdk/extensions"
-    "github.com/Universal-Commerce-Protocol/go-sdk/models"
-    "github.com/Universal-Commerce-Protocol/go-sdk/server"
+    "github.com/dhananjay2021/ucp-go-sdk/client"
+    "github.com/dhananjay2021/ucp-go-sdk/extensions"
+    "github.com/dhananjay2021/ucp-go-sdk/models"
+    "github.com/dhananjay2021/ucp-go-sdk/server"
 )
 
 func main() {
