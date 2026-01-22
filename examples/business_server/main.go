@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"sync/atomic"
 
 	"github.com/dhananjay2021/ucp-go-sdk/client"
 	"github.com/dhananjay2021/ucp-go-sdk/extensions"
@@ -48,14 +49,12 @@ var (
 	checkouts = make(map[string]*extensions.ExtendedCheckoutResponse)
 	orders    = make(map[string]*models.Order)
 	mu        sync.RWMutex
-	idCounter = 0
+	idCounter atomic.Int64
 )
 
 func generateID(prefix string) string {
-	mu.Lock()
-	defer mu.Unlock()
-	idCounter++
-	return fmt.Sprintf("%s-%d", prefix, idCounter)
+	id := idCounter.Add(1)
+	return fmt.Sprintf("%s-%d", prefix, id)
 }
 
 func main() {
