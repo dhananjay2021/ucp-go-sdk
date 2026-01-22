@@ -67,30 +67,22 @@ func main() {
 	}
 
 	// Step 2: Create a checkout session
+	// Note: In UCP, the platform sends only item IDs. The merchant
+	// returns the full item details (title, price, etc.) in the response.
 	fmt.Println("\n=== Step 2: Creating checkout session ===")
 	checkout, err := ucpClient.CreateCheckout(ctx, &extensions.ExtendedCheckoutCreateRequest{
 		LineItems: []models.LineItemCreateRequest{
 			{
-				Item: models.ItemCreateRequest{
-					ID:          "PROD-001",
-					Name:        "Wireless Headphones",
-					Description: "Premium wireless headphones with noise cancellation",
-					Price:       "149.99",
-					ImageURL:    "https://example.com/images/headphones.jpg",
-				},
+				Item:     models.ItemCreateRequest{ID: "PROD-001"},
 				Quantity: 1,
 			},
 			{
-				Item: models.ItemCreateRequest{
-					ID:          "PROD-002",
-					Name:        "Phone Case",
-					Description: "Protective phone case",
-					Price:       "29.99",
-				},
+				Item:     models.ItemCreateRequest{ID: "PROD-002"},
 				Quantity: 2,
 			},
 		},
 		Currency: "USD",
+		Payment:  models.PaymentCreateRequest{},
 	})
 	if err != nil {
 		log.Fatalf("Failed to create checkout: %v", err)
@@ -100,34 +92,41 @@ func main() {
 	fmt.Printf("Status: %s\n", checkout.Status)
 	fmt.Printf("Line items: %d\n", len(checkout.LineItems))
 	for _, total := range checkout.Totals {
-		fmt.Printf("  %s: %s\n", total.Type, total.Amount)
+		fmt.Printf("  %s: %d (cents)\n", total.Type, total.Amount)
 	}
 
 	// Step 3: Update checkout with buyer information
 	fmt.Println("\n=== Step 3: Updating checkout with buyer info ===")
 	checkout, err = ucpClient.UpdateCheckout(ctx, checkout.ID, &extensions.ExtendedCheckoutUpdateRequest{
-		Buyer: &models.BuyerConsentUpdateRequest{
-			Email:     "buyer@example.com",
-			FirstName: "Jane",
-			LastName:  "Doe",
-			Phone:     "+1-555-123-4567",
-			BillingAddress: &models.PostalAddress{
-				AddressLines:       []string{"123 Main St", "Apt 4B"},
-				Locality:           "San Francisco",
-				AdministrativeArea: "CA",
-				PostalCode:         "94102",
-				CountryCode:        "US",
-			},
+		ID: checkout.ID,
+		LineItems: []models.LineItemUpdateRequest{
+			{Item: models.ItemUpdateRequest{ID: "PROD-001"}, Quantity: 1},
+			{Item: models.ItemUpdateRequest{ID: "PROD-002"}, Quantity: 2},
+		},
+		Currency: "USD",
+		Payment:  models.PaymentUpdateRequest{},
+		Buyer: &models.BuyerWithConsentUpdateRequest{
+			Email:       "buyer@example.com",
+			FirstName:   "Jane",
+			LastName:    "Doe",
+			PhoneNumber: "+1-555-123-4567",
 		},
 		Fulfillment: &models.FulfillmentUpdateRequest{
-			Destination: &models.FulfillmentDestinationRequest{
-				Shipping: &models.ShippingDestinationRequest{
-					Address: &models.PostalAddress{
-						AddressLines:       []string{"123 Main St", "Apt 4B"},
-						Locality:           "San Francisco",
-						AdministrativeArea: "CA",
-						PostalCode:         "94102",
-						CountryCode:        "US",
+			Methods: []models.FulfillmentMethodUpdateRequest{
+				{
+					ID:          "ship-1",
+					LineItemIDs: []string{"PROD-001", "PROD-002"},
+					Destinations: []models.FulfillmentDestinationRequest{
+						{
+							PostalAddress: models.PostalAddress{
+								StreetAddress:   "123 Main St",
+								ExtendedAddress: "Apt 4B",
+								AddressLocality: "San Francisco",
+								AddressRegion:   "CA",
+								PostalCode:      "94102",
+								AddressCountry:  "US",
+							},
+						},
 					},
 				},
 			},
@@ -142,9 +141,23 @@ func main() {
 	// Step 4: Add payment (simulated - in real scenario, this would involve tokenization)
 	fmt.Println("\n=== Step 4: Adding payment information ===")
 	checkout, err = ucpClient.UpdateCheckout(ctx, checkout.ID, &extensions.ExtendedCheckoutUpdateRequest{
-		Payment: &models.PaymentUpdateRequest{
-			HandlerID: "default",
-			Token:     "tok_test_simulated",
+		ID: checkout.ID,
+		LineItems: []models.LineItemUpdateRequest{
+			{Item: models.ItemUpdateRequest{ID: "PROD-001"}, Quantity: 1},
+			{Item: models.ItemUpdateRequest{ID: "PROD-002"}, Quantity: 2},
+		},
+		Currency: "USD",
+		Payment: models.PaymentUpdateRequest{
+			SelectedInstrumentID: "pi-test-001",
+			Instruments: []models.PaymentInstrument{
+				{
+					ID:         "pi-test-001",
+					HandlerID:  "default",
+					Type:       models.PaymentInstrumentTypeCard,
+					Brand:      "visa",
+					LastDigits: "4242",
+				},
+			},
 		},
 	})
 	if err != nil {
@@ -173,7 +186,7 @@ func main() {
 		if len(checkout.Messages) > 0 {
 			fmt.Println("Messages:")
 			for _, msg := range checkout.Messages {
-				fmt.Printf("  [%s] %s: %s\n", msg.Type, msg.Title, msg.Detail)
+				fmt.Printf("  [%s] %s\n", msg.Type, msg.Content)
 			}
 		}
 	}
@@ -185,7 +198,6 @@ func main() {
 		if err != nil {
 			log.Printf("Failed to get order: %v", err)
 		} else {
-			fmt.Printf("Order status: %s\n", order.Status)
 			fmt.Printf("Order items: %d\n", len(order.LineItems))
 		}
 	}

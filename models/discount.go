@@ -14,84 +14,73 @@
 
 package models
 
-// DiscountType represents the type of discount.
-type DiscountType string
+// AllocationMethod represents how a discount is allocated.
+type AllocationMethod string
 
 const (
-	// DiscountTypeCode is a discount code/coupon.
-	DiscountTypeCode DiscountType = "code"
+	// AllocationMethodEach applies discount independently per item.
+	AllocationMethodEach AllocationMethod = "each"
 
-	// DiscountTypeAutomatic is an automatically applied discount.
-	DiscountTypeAutomatic DiscountType = "automatic"
-
-	// DiscountTypeLoyalty is a loyalty program discount.
-	DiscountTypeLoyalty DiscountType = "loyalty"
+	// AllocationMethodAcross splits discount proportionally by value.
+	AllocationMethodAcross AllocationMethod = "across"
 )
 
-// DiscountStatus represents the status of a discount.
-type DiscountStatus string
+// DiscountAllocation represents how a discount amount was allocated to a target.
+type DiscountAllocation struct {
+	// Path is the JSONPath to the allocation target.
+	Path string `json:"path"`
 
-const (
-	// DiscountStatusPending indicates the discount is pending validation.
-	DiscountStatusPending DiscountStatus = "pending"
-
-	// DiscountStatusApplied indicates the discount has been applied.
-	DiscountStatusApplied DiscountStatus = "applied"
-
-	// DiscountStatusRejected indicates the discount was rejected.
-	DiscountStatusRejected DiscountStatus = "rejected"
-
-	// DiscountStatusExpired indicates the discount has expired.
-	DiscountStatusExpired DiscountStatus = "expired"
-)
-
-// DiscountCreateRequest represents a request to apply a discount.
-type DiscountCreateRequest struct {
-	// Code is the discount code.
-	Code string `json:"code,omitempty"`
-
-	// Type is the discount type.
-	Type DiscountType `json:"type,omitempty"`
+	// Amount is the amount allocated in minor (cents) currency units.
+	Amount int `json:"amount"`
 }
 
-// DiscountUpdateRequest represents a request to update a discount.
-type DiscountUpdateRequest struct {
-	// ID is the discount identifier.
-	ID string `json:"id"`
+// AppliedDiscount represents a discount that was successfully applied.
+type AppliedDiscount struct {
+	// Title is the human-readable discount name.
+	Title string `json:"title"`
 
-	// Code is the updated discount code.
+	// Amount is the total discount amount in minor (cents) currency units.
+	Amount int `json:"amount"`
+
+	// Code is the discount code (omitted for automatic discounts).
 	Code string `json:"code,omitempty"`
+
+	// Automatic indicates if applied automatically by merchant rules.
+	Automatic bool `json:"automatic,omitempty"`
+
+	// Method is the allocation method (each or across).
+	Method AllocationMethod `json:"method,omitempty"`
+
+	// Priority is the stacking order (lower numbers applied first).
+	Priority int `json:"priority,omitempty"`
+
+	// Allocations is the breakdown of where this discount was allocated.
+	Allocations []DiscountAllocation `json:"allocations,omitempty"`
 }
 
-// DiscountResponse represents a discount in a response.
-type DiscountResponse struct {
-	// ID is the discount identifier.
-	ID string `json:"id"`
+// DiscountsCreateRequest represents discounts in a checkout create request.
+type DiscountsCreateRequest struct {
+	// Codes are discount codes to apply (case-insensitive).
+	Codes []string `json:"codes,omitempty"`
 
-	// Code is the discount code.
-	Code string `json:"code,omitempty"`
+	// Applied contains applied discounts (for platform-side pre-application).
+	Applied []AppliedDiscount `json:"applied,omitempty"`
+}
 
-	// Type is the discount type.
-	Type DiscountType `json:"type,omitempty"`
+// DiscountsUpdateRequest represents discounts in a checkout update request.
+type DiscountsUpdateRequest struct {
+	// Codes are discount codes to apply (replaces previously submitted codes).
+	Codes []string `json:"codes,omitempty"`
 
-	// Status is the discount status.
-	Status DiscountStatus `json:"status"`
+	// Applied contains applied discounts (for platform-side pre-application).
+	Applied []AppliedDiscount `json:"applied,omitempty"`
+}
 
-	// Name is a display name for the discount.
-	Name string `json:"name,omitempty"`
+// DiscountsResponse represents discounts in a checkout response.
+type DiscountsResponse struct {
+	// Codes are the discount codes that were submitted.
+	Codes []string `json:"codes,omitempty"`
 
-	// Description provides details about the discount.
-	Description string `json:"description,omitempty"`
-
-	// Amount is the discount amount.
-	Amount string `json:"amount,omitempty"`
-
-	// Percentage is the discount percentage.
-	Percentage string `json:"percentage,omitempty"`
-
-	// LineItemIDs are the line items this discount applies to.
-	LineItemIDs []string `json:"line_item_ids,omitempty"`
-
-	// Message contains any error or info message.
-	Message *Message `json:"message,omitempty"`
+	// Applied contains discounts successfully applied (code-based and automatic).
+	Applied []AppliedDiscount `json:"applied,omitempty"`
 }

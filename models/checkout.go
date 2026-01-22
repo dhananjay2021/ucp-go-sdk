@@ -24,29 +24,29 @@ type CheckoutCreateRequest struct {
 	// Currency is the ISO 4217 currency code.
 	Currency string `json:"currency"`
 
+	// Payment contains payment information.
+	Payment PaymentCreateRequest `json:"payment"`
+
 	// Buyer contains optional buyer information.
 	Buyer *Buyer `json:"buyer,omitempty"`
-
-	// Totals contains optional totals.
-	Totals []TotalCreateRequest `json:"totals,omitempty"`
-
-	// Metadata contains optional custom metadata.
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // CheckoutUpdateRequest represents a request to update a checkout session.
 type CheckoutUpdateRequest struct {
-	// LineItems are updated line items.
-	LineItems []LineItemUpdateRequest `json:"line_items,omitempty"`
+	// ID is the unique identifier of the checkout session.
+	ID string `json:"id"`
 
-	// Buyer contains updated buyer information.
+	// LineItems are the line items being checked out.
+	LineItems []LineItemUpdateRequest `json:"line_items"`
+
+	// Currency is the ISO 4217 currency code.
+	Currency string `json:"currency"`
+
+	// Payment contains payment information.
+	Payment PaymentUpdateRequest `json:"payment"`
+
+	// Buyer contains optional buyer information.
 	Buyer *Buyer `json:"buyer,omitempty"`
-
-	// Totals contains updated totals.
-	Totals []TotalCreateRequest `json:"totals,omitempty"`
-
-	// Metadata contains updated metadata.
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // CheckoutResponse represents a checkout session response.
@@ -60,9 +60,6 @@ type CheckoutResponse struct {
 	// LineItems are the items being checked out.
 	LineItems []LineItemResponse `json:"line_items"`
 
-	// Buyer contains buyer information.
-	Buyer *Buyer `json:"buyer,omitempty"`
-
 	// Status is the current checkout state.
 	Status CheckoutStatus `json:"status"`
 
@@ -72,11 +69,17 @@ type CheckoutResponse struct {
 	// Totals contains the cart totals breakdown.
 	Totals []TotalResponse `json:"totals"`
 
-	// Messages contains error and info messages.
-	Messages []Message `json:"messages,omitempty"`
-
 	// Links are URLs to be displayed by the platform.
 	Links []Link `json:"links"`
+
+	// Payment contains payment information.
+	Payment PaymentResponse `json:"payment"`
+
+	// Buyer contains buyer information.
+	Buyer *Buyer `json:"buyer,omitempty"`
+
+	// Messages contains error and info messages.
+	Messages []Message `json:"messages,omitempty"`
 
 	// ExpiresAt is the RFC 3339 expiry timestamp.
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
@@ -84,18 +87,12 @@ type CheckoutResponse struct {
 	// ContinueURL is for checkout handoff and session recovery.
 	ContinueURL string `json:"continue_url,omitempty"`
 
-	// Payment contains payment information.
-	Payment PaymentResponse `json:"payment"`
-
 	// Order contains details about an order created for this checkout.
 	Order *OrderConfirmation `json:"order,omitempty"`
-
-	// Metadata contains custom metadata.
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // CheckoutCompleteRequest represents a request to complete a checkout.
 type CheckoutCompleteRequest struct {
-	// IdempotencyKey is a unique key for idempotent requests.
-	IdempotencyKey string `json:"idempotency_key,omitempty"`
+	// This is intentionally empty for the base checkout.
+	// Extensions like AP2 add fields via composition.
 }

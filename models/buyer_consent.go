@@ -14,107 +14,88 @@
 
 package models
 
-// AccountInfo represents buyer account information.
-type AccountInfo struct {
-	// ID is the account identifier.
-	ID string `json:"id,omitempty"`
+// Consent represents user consent states for data processing.
+type Consent struct {
+	// Analytics indicates consent for analytics and performance tracking.
+	Analytics *bool `json:"analytics,omitempty"`
 
-	// Email is the account email.
-	Email string `json:"email,omitempty"`
+	// Preferences indicates consent for storing user preferences.
+	Preferences *bool `json:"preferences,omitempty"`
 
-	// Phone is the account phone number.
-	Phone string `json:"phone,omitempty"`
+	// Marketing indicates consent for marketing communications.
+	Marketing *bool `json:"marketing,omitempty"`
 
-	// FirstName is the account holder's first name.
-	FirstName string `json:"first_name,omitempty"`
-
-	// LastName is the account holder's last name.
-	LastName string `json:"last_name,omitempty"`
-
-	// Linked indicates if the account is linked.
-	Linked bool `json:"linked,omitempty"`
+	// SaleOfData indicates consent for selling data to third parties (CCPA).
+	SaleOfData *bool `json:"sale_of_data,omitempty"`
 }
 
-// BuyerConsentCreateRequest represents buyer consent in a create request.
-type BuyerConsentCreateRequest struct {
-	// Email is the buyer's email.
-	Email string `json:"email,omitempty"`
+// BuyerWithConsent represents a buyer with consent tracking.
+type BuyerWithConsent struct {
+	Buyer
 
-	// Phone is the buyer's phone number.
-	Phone string `json:"phone,omitempty"`
+	// Consent contains consent tracking fields.
+	Consent *Consent `json:"consent,omitempty"`
+}
 
+// BuyerWithConsentCreateRequest represents buyer with consent in a create request.
+type BuyerWithConsentCreateRequest struct {
 	// FirstName is the buyer's first name.
 	FirstName string `json:"first_name,omitempty"`
 
 	// LastName is the buyer's last name.
 	LastName string `json:"last_name,omitempty"`
 
-	// BillingAddress is the buyer's billing address.
-	BillingAddress *PostalAddress `json:"billing_address,omitempty"`
+	// FullName is the buyer's full name.
+	FullName string `json:"full_name,omitempty"`
 
-	// MarketingOptIn indicates consent to marketing.
-	MarketingOptIn *bool `json:"marketing_opt_in,omitempty"`
-
-	// TermsAccepted indicates acceptance of terms.
-	TermsAccepted *bool `json:"terms_accepted,omitempty"`
-
-	// AccountInfo contains linked account info.
-	AccountInfo *AccountInfo `json:"account_info,omitempty"`
-}
-
-// BuyerConsentUpdateRequest represents buyer consent in an update request.
-type BuyerConsentUpdateRequest struct {
-	// Email is the buyer's email.
+	// Email is the buyer's email address.
 	Email string `json:"email,omitempty"`
 
-	// Phone is the buyer's phone number.
-	Phone string `json:"phone,omitempty"`
+	// PhoneNumber is the buyer's phone number.
+	PhoneNumber string `json:"phone_number,omitempty"`
 
+	// Consent contains consent tracking fields.
+	Consent *Consent `json:"consent,omitempty"`
+}
+
+// BuyerWithConsentUpdateRequest represents buyer with consent in an update request.
+type BuyerWithConsentUpdateRequest struct {
 	// FirstName is the buyer's first name.
 	FirstName string `json:"first_name,omitempty"`
 
 	// LastName is the buyer's last name.
 	LastName string `json:"last_name,omitempty"`
 
-	// BillingAddress is the buyer's billing address.
-	BillingAddress *PostalAddress `json:"billing_address,omitempty"`
+	// FullName is the buyer's full name.
+	FullName string `json:"full_name,omitempty"`
 
-	// MarketingOptIn indicates consent to marketing.
-	MarketingOptIn *bool `json:"marketing_opt_in,omitempty"`
-
-	// TermsAccepted indicates acceptance of terms.
-	TermsAccepted *bool `json:"terms_accepted,omitempty"`
-
-	// AccountInfo contains linked account info.
-	AccountInfo *AccountInfo `json:"account_info,omitempty"`
-}
-
-// BuyerConsentResponse represents buyer consent in a response.
-type BuyerConsentResponse struct {
-	// Email is the buyer's email.
+	// Email is the buyer's email address.
 	Email string `json:"email,omitempty"`
 
-	// Phone is the buyer's phone number.
-	Phone string `json:"phone,omitempty"`
+	// PhoneNumber is the buyer's phone number.
+	PhoneNumber string `json:"phone_number,omitempty"`
 
+	// Consent contains consent tracking fields.
+	Consent *Consent `json:"consent,omitempty"`
+}
+
+// BuyerWithConsentResponse represents buyer with consent in a response.
+type BuyerWithConsentResponse struct {
 	// FirstName is the buyer's first name.
 	FirstName string `json:"first_name,omitempty"`
 
 	// LastName is the buyer's last name.
 	LastName string `json:"last_name,omitempty"`
 
-	// BillingAddress is the buyer's billing address.
-	BillingAddress *PostalAddress `json:"billing_address,omitempty"`
+	// FullName is the buyer's full name.
+	FullName string `json:"full_name,omitempty"`
 
-	// MarketingOptIn indicates consent to marketing.
-	MarketingOptIn *bool `json:"marketing_opt_in,omitempty"`
+	// Email is the buyer's email address.
+	Email string `json:"email,omitempty"`
 
-	// TermsAccepted indicates acceptance of terms.
-	TermsAccepted *bool `json:"terms_accepted,omitempty"`
+	// PhoneNumber is the buyer's phone number.
+	PhoneNumber string `json:"phone_number,omitempty"`
 
-	// AccountInfo contains linked account info.
-	AccountInfo *AccountInfo `json:"account_info,omitempty"`
-
-	// RequiredFields lists fields that are required.
-	RequiredFields []string `json:"required_fields,omitempty"`
+	// Consent contains consent tracking fields.
+	Consent *Consent `json:"consent,omitempty"`
 }

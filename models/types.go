@@ -14,8 +14,6 @@
 
 package models
 
-import "time"
-
 // CheckoutStatus represents the state of a checkout session.
 type CheckoutStatus string
 
@@ -148,13 +146,13 @@ const (
 
 // Link represents a link to be displayed by the platform.
 type Link struct {
-	// Rel is the link relation type.
-	Rel string `json:"rel"`
+	// Type is the link type (e.g., privacy_policy, terms_of_service, refund_policy).
+	Type string `json:"type"`
 
-	// Href is the URL of the link.
-	Href string `json:"href"`
+	// URL is the actual URL pointing to the content.
+	URL string `json:"url"`
 
-	// Title is an optional display title.
+	// Title is an optional display text for the link.
 	Title string `json:"title,omitempty"`
 }
 
@@ -166,23 +164,17 @@ type Message struct {
 	// Code is a machine-readable error code.
 	Code string `json:"code,omitempty"`
 
-	// Title is a short summary of the message.
-	Title string `json:"title"`
+	// Content is the human-readable message.
+	Content string `json:"content"`
 
-	// Detail provides additional context.
-	Detail string `json:"detail,omitempty"`
-
-	// ContentType indicates the format of the detail (plain, markdown).
+	// ContentType indicates the format of the content (plain, markdown).
 	ContentType ContentType `json:"content_type,omitempty"`
 
 	// Severity indicates who can resolve this issue.
 	Severity Severity `json:"severity,omitempty"`
 
-	// Field is the field this message relates to.
-	Field string `json:"field,omitempty"`
-
-	// ContinueURL is a URL for resolving the issue.
-	ContinueURL string `json:"continue_url,omitempty"`
+	// Path is the RFC 9535 JSONPath to the component this message refers to.
+	Path string `json:"path,omitempty"`
 }
 
 // TotalResponse represents a total amount breakdown.
@@ -190,11 +182,11 @@ type TotalResponse struct {
 	// Type is the categorization of this total.
 	Type TotalType `json:"type"`
 
-	// Amount is the monetary value as a string.
-	Amount string `json:"amount"`
+	// Amount is the monetary value in minor (cents) currency units.
+	Amount int `json:"amount"`
 
-	// Label is an optional display label.
-	Label string `json:"label,omitempty"`
+	// DisplayText is the text to display against the amount.
+	DisplayText string `json:"display_text,omitempty"`
 }
 
 // TotalCreateRequest represents a total in a create request.
@@ -202,35 +194,41 @@ type TotalCreateRequest struct {
 	// Type is the categorization of this total.
 	Type TotalType `json:"type"`
 
-	// Amount is the monetary value as a string.
-	Amount string `json:"amount"`
+	// Amount is the monetary value in minor (cents) currency units.
+	Amount int `json:"amount"`
 
-	// Label is an optional display label.
-	Label string `json:"label,omitempty"`
+	// DisplayText is the text to display against the amount.
+	DisplayText string `json:"display_text,omitempty"`
 }
 
-// PostalAddress represents a postal/mailing address.
+// PostalAddress represents a postal/mailing address using Schema.org naming conventions.
 type PostalAddress struct {
-	// AddressLines are the street address lines.
-	AddressLines []string `json:"address_lines,omitempty"`
+	// StreetAddress is the street address.
+	StreetAddress string `json:"street_address,omitempty"`
 
-	// Locality is the city/town.
-	Locality string `json:"locality,omitempty"`
+	// ExtendedAddress is an address extension such as apartment number or C/O.
+	ExtendedAddress string `json:"extended_address,omitempty"`
 
-	// AdministrativeArea is the state/province/region.
-	AdministrativeArea string `json:"administrative_area,omitempty"`
+	// AddressLocality is the city/town (e.g., Mountain View).
+	AddressLocality string `json:"address_locality,omitempty"`
 
-	// PostalCode is the ZIP/postal code.
+	// AddressRegion is the state/province/region (e.g., California).
+	AddressRegion string `json:"address_region,omitempty"`
+
+	// AddressCountry is the country code (ISO 3166-1 alpha-2 recommended, e.g., "US").
+	AddressCountry string `json:"address_country,omitempty"`
+
+	// PostalCode is the ZIP/postal code (e.g., 94043).
 	PostalCode string `json:"postal_code,omitempty"`
 
-	// CountryCode is the ISO 3166-1 alpha-2 country code.
-	CountryCode string `json:"country_code,omitempty"`
+	// FirstName is the first name of the contact.
+	FirstName string `json:"first_name,omitempty"`
 
-	// Recipients are the names of recipients.
-	Recipients []string `json:"recipients,omitempty"`
+	// LastName is the last name of the contact.
+	LastName string `json:"last_name,omitempty"`
 
-	// Organization is the company/organization name.
-	Organization string `json:"organization,omitempty"`
+	// FullName is the full name of the contact (first_name/last_name take precedence if present).
+	FullName string `json:"full_name,omitempty"`
 
 	// PhoneNumber is a contact phone number.
 	PhoneNumber string `json:"phone_number,omitempty"`
@@ -239,55 +237,29 @@ type PostalAddress struct {
 // ItemResponse represents an item in a line item response.
 type ItemResponse struct {
 	// ID is a unique identifier for the item.
-	ID string `json:"id,omitempty"`
+	ID string `json:"id"`
 
-	// Name is the display name of the item.
-	Name string `json:"name"`
+	// Title is the product title.
+	Title string `json:"title"`
 
-	// Description provides additional details.
-	Description string `json:"description,omitempty"`
-
-	// Price is the unit price as a string.
-	Price string `json:"price"`
+	// Price is the unit price in minor (cents) currency units.
+	Price int `json:"price"`
 
 	// ImageURL is a URL to an item image.
 	ImageURL string `json:"image_url,omitempty"`
-
-	// ProductURL is a URL to the product page.
-	ProductURL string `json:"product_url,omitempty"`
-
-	// SKU is the stock keeping unit.
-	SKU string `json:"sku,omitempty"`
-
-	// Attributes contains item-specific attributes.
-	Attributes map[string]string `json:"attributes,omitempty"`
 }
 
 // ItemCreateRequest represents an item in a create request.
+// The platform sends just the ID; the business returns full item details.
 type ItemCreateRequest struct {
-	// ID is a unique identifier for the item.
-	ID string `json:"id,omitempty"`
+	// ID is the unique identifier for the item.
+	ID string `json:"id"`
+}
 
-	// Name is the display name of the item.
-	Name string `json:"name"`
-
-	// Description provides additional details.
-	Description string `json:"description,omitempty"`
-
-	// Price is the unit price as a string.
-	Price string `json:"price"`
-
-	// ImageURL is a URL to an item image.
-	ImageURL string `json:"image_url,omitempty"`
-
-	// ProductURL is a URL to the product page.
-	ProductURL string `json:"product_url,omitempty"`
-
-	// SKU is the stock keeping unit.
-	SKU string `json:"sku,omitempty"`
-
-	// Attributes contains item-specific attributes.
-	Attributes map[string]string `json:"attributes,omitempty"`
+// ItemUpdateRequest represents an item in an update request.
+type ItemUpdateRequest struct {
+	// ID is the unique identifier for the item.
+	ID string `json:"id"`
 }
 
 // LineItemResponse represents a line item in a checkout response.
@@ -310,75 +282,51 @@ type LineItemResponse struct {
 
 // LineItemCreateRequest represents a line item in a create request.
 type LineItemCreateRequest struct {
-	// ID is an optional client-provided identifier.
-	ID string `json:"id,omitempty"`
-
 	// Item contains the item details.
 	Item ItemCreateRequest `json:"item"`
 
 	// Quantity is the number of items.
 	Quantity int `json:"quantity"`
-
-	// Totals contains optional totals.
-	Totals []TotalCreateRequest `json:"totals,omitempty"`
-
-	// ParentID is the parent line item identifier for nested structures.
-	ParentID string `json:"parent_id,omitempty"`
 }
 
 // LineItemUpdateRequest represents a line item update.
 type LineItemUpdateRequest struct {
 	// ID is the line item identifier.
-	ID string `json:"id"`
+	ID string `json:"id,omitempty"`
 
 	// Item contains updated item details.
-	Item *ItemCreateRequest `json:"item,omitempty"`
+	Item ItemUpdateRequest `json:"item"`
 
 	// Quantity is the updated quantity.
-	Quantity *int `json:"quantity,omitempty"`
+	Quantity int `json:"quantity"`
+
+	// ParentID is the parent line item identifier for nested structures.
+	ParentID string `json:"parent_id,omitempty"`
 }
 
 // Buyer represents information about the buyer.
 type Buyer struct {
-	// Email is the buyer's email address.
-	Email string `json:"email,omitempty"`
-
-	// Phone is the buyer's phone number.
-	Phone string `json:"phone,omitempty"`
-
 	// FirstName is the buyer's first name.
 	FirstName string `json:"first_name,omitempty"`
 
 	// LastName is the buyer's last name.
 	LastName string `json:"last_name,omitempty"`
 
-	// BillingAddress is the buyer's billing address.
-	BillingAddress *PostalAddress `json:"billing_address,omitempty"`
+	// FullName is the buyer's full name (first_name/last_name take precedence if present).
+	FullName string `json:"full_name,omitempty"`
+
+	// Email is the buyer's email address.
+	Email string `json:"email,omitempty"`
+
+	// PhoneNumber is the buyer's phone number (E.164 format).
+	PhoneNumber string `json:"phone_number,omitempty"`
 }
 
 // OrderConfirmation contains details about an order created for a checkout.
 type OrderConfirmation struct {
-	// ID is the order identifier.
+	// ID is the unique order identifier.
 	ID string `json:"id"`
 
-	// PermalinkURL is a URL to view the order.
-	PermalinkURL string `json:"permalink_url,omitempty"`
-
-	// CreatedAt is when the order was created.
-	CreatedAt *time.Time `json:"created_at,omitempty"`
-}
-
-// Expectation represents a delivery expectation.
-type Expectation struct {
-	// MinDays is the minimum number of days.
-	MinDays *int `json:"min_days,omitempty"`
-
-	// MaxDays is the maximum number of days.
-	MaxDays *int `json:"max_days,omitempty"`
-
-	// DeliveryDate is a specific delivery date.
-	DeliveryDate string `json:"delivery_date,omitempty"`
-
-	// Description is a human-readable description.
-	Description string `json:"description,omitempty"`
+	// PermalinkURL is a permalink to access the order on the merchant site.
+	PermalinkURL string `json:"permalink_url"`
 }

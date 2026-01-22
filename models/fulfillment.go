@@ -16,160 +16,123 @@ package models
 
 import "time"
 
-// RetailLocationRequest represents a retail location in a request.
-type RetailLocationRequest struct {
-	// ID is the location identifier.
-	ID string `json:"id,omitempty"`
+// FulfillmentMethodType represents the type of fulfillment method.
+type FulfillmentMethodType string
 
-	// Name is the location name.
-	Name string `json:"name,omitempty"`
+const (
+	// FulfillmentMethodTypeShipping indicates shipping delivery.
+	FulfillmentMethodTypeShipping FulfillmentMethodType = "shipping"
 
-	// Address is the location address.
-	Address *PostalAddress `json:"address,omitempty"`
-}
-
-// RetailLocationResponse represents a retail location in a response.
-type RetailLocationResponse struct {
-	// ID is the location identifier.
-	ID string `json:"id"`
-
-	// Name is the location name.
-	Name string `json:"name"`
-
-	// Address is the location address.
-	Address *PostalAddress `json:"address,omitempty"`
-
-	// Hours contains operating hours.
-	Hours string `json:"hours,omitempty"`
-
-	// Phone is the location phone number.
-	Phone string `json:"phone,omitempty"`
-}
+	// FulfillmentMethodTypePickup indicates in-store pickup.
+	FulfillmentMethodTypePickup FulfillmentMethodType = "pickup"
+)
 
 // ShippingDestinationRequest represents a shipping destination in a request.
 type ShippingDestinationRequest struct {
-	// Address is the shipping address.
-	Address *PostalAddress `json:"address,omitempty"`
+	PostalAddress
+
+	// ID is an optional identifier for this shipping destination.
+	ID string `json:"id,omitempty"`
 }
 
 // ShippingDestinationResponse represents a shipping destination in a response.
 type ShippingDestinationResponse struct {
-	// Address is the shipping address.
+	PostalAddress
+
+	// ID is a unique identifier for this shipping destination.
+	ID string `json:"id"`
+}
+
+// RetailLocationRequest represents a retail/pickup location in a request.
+type RetailLocationRequest struct {
+	// Name is the location name (e.g., store name).
+	Name string `json:"name"`
+
+	// Address is the physical address of the location.
+	Address *PostalAddress `json:"address,omitempty"`
+}
+
+// RetailLocationResponse represents a retail/pickup location in a response.
+type RetailLocationResponse struct {
+	// ID is a unique identifier for this location.
+	ID string `json:"id"`
+
+	// Name is the location name (e.g., store name).
+	Name string `json:"name"`
+
+	// Address is the physical address of the location.
 	Address *PostalAddress `json:"address,omitempty"`
 }
 
 // FulfillmentDestinationRequest represents a fulfillment destination in a request.
+// Can be either a shipping address or a pickup location.
 type FulfillmentDestinationRequest struct {
-	// Shipping contains shipping destination details.
-	Shipping *ShippingDestinationRequest `json:"shipping,omitempty"`
+	// Shipping destination fields (embedded PostalAddress)
+	PostalAddress
 
-	// Pickup contains pickup location details.
-	Pickup *RetailLocationRequest `json:"pickup,omitempty"`
+	// ID is an optional identifier for this destination.
+	ID string `json:"id,omitempty"`
+
+	// Address is used for pickup locations.
+	Address *PostalAddress `json:"address,omitempty"`
+
+	// Name is the location name (for pickup locations).
+	Name string `json:"name,omitempty"`
 }
 
 // FulfillmentDestinationResponse represents a fulfillment destination in a response.
+// Can be either a shipping address or a pickup location.
 type FulfillmentDestinationResponse struct {
-	// Shipping contains shipping destination details.
-	Shipping *ShippingDestinationResponse `json:"shipping,omitempty"`
+	// Shipping destination fields (embedded PostalAddress)
+	PostalAddress
 
-	// Pickup contains pickup location details.
-	Pickup *RetailLocationResponse `json:"pickup,omitempty"`
-}
-
-// FulfillmentMethodRequest represents a fulfillment method in a request.
-type FulfillmentMethodRequest struct {
-	// ID is the method identifier.
-	ID string `json:"id,omitempty"`
-
-	// Type is the delivery method type.
-	Type MethodType `json:"type,omitempty"`
-}
-
-// FulfillmentMethodResponse represents a fulfillment method in a response.
-type FulfillmentMethodResponse struct {
-	// ID is the method identifier.
+	// ID is a unique identifier for this destination.
 	ID string `json:"id"`
 
-	// Type is the delivery method type.
-	Type MethodType `json:"type"`
+	// Address is used for pickup locations.
+	Address *PostalAddress `json:"address,omitempty"`
 
-	// Name is the display name.
+	// Name is the location name (for pickup locations).
 	Name string `json:"name,omitempty"`
-
-	// Description provides additional details.
-	Description string `json:"description,omitempty"`
-
-	// Price is the cost as a string.
-	Price string `json:"price,omitempty"`
-
-	// Expectation contains delivery timing.
-	Expectation *Expectation `json:"expectation,omitempty"`
-
-	// Selected indicates if this method is selected.
-	Selected bool `json:"selected,omitempty"`
 }
 
-// FulfillmentAvailableMethodRequest represents an available method query.
-type FulfillmentAvailableMethodRequest struct {
-	// Type filters by method type.
-	Type MethodType `json:"type,omitempty"`
-
-	// Destination is the delivery destination.
-	Destination *FulfillmentDestinationRequest `json:"destination,omitempty"`
-}
-
-// FulfillmentAvailableMethodResponse represents an available fulfillment method.
-type FulfillmentAvailableMethodResponse struct {
-	// ID is the method identifier.
+// FulfillmentOptionResponse represents a fulfillment option within a group.
+type FulfillmentOptionResponse struct {
+	// ID is a unique fulfillment option identifier.
 	ID string `json:"id"`
 
-	// Type is the delivery method type.
-	Type MethodType `json:"type"`
+	// Title is a short label (e.g., "Express Shipping", "Curbside Pickup").
+	Title string `json:"title"`
 
-	// Name is the display name.
-	Name string `json:"name"`
-
-	// Description provides additional details.
+	// Description provides complete context for buyer decision.
 	Description string `json:"description,omitempty"`
 
-	// Price is the cost as a string.
-	Price string `json:"price,omitempty"`
+	// Carrier is the carrier name (for shipping).
+	Carrier string `json:"carrier,omitempty"`
 
-	// Expectation contains delivery timing.
-	Expectation *Expectation `json:"expectation,omitempty"`
+	// EarliestFulfillmentTime is the earliest fulfillment date.
+	EarliestFulfillmentTime *time.Time `json:"earliest_fulfillment_time,omitempty"`
+
+	// LatestFulfillmentTime is the latest fulfillment date.
+	LatestFulfillmentTime *time.Time `json:"latest_fulfillment_time,omitempty"`
+
+	// Totals contains the fulfillment option totals breakdown.
+	Totals []TotalResponse `json:"totals"`
 }
 
-// FulfillmentOptionRequest represents a fulfillment option in a request.
-type FulfillmentOptionRequest struct {
-	// MethodID is the selected method ID.
-	MethodID string `json:"method_id,omitempty"`
-
-	// Destination is the delivery destination.
-	Destination *FulfillmentDestinationRequest `json:"destination,omitempty"`
+// FulfillmentGroupCreateRequest represents a fulfillment group in a create request.
+type FulfillmentGroupCreateRequest struct {
+	// SelectedOptionID is the ID of the selected fulfillment option.
+	SelectedOptionID *string `json:"selected_option_id,omitempty"`
 }
 
-// FulfillmentOptionResponse represents a fulfillment option in a response.
-type FulfillmentOptionResponse struct {
-	// Method is the selected method.
-	Method *FulfillmentMethodResponse `json:"method,omitempty"`
-
-	// Destination is the delivery destination.
-	Destination *FulfillmentDestinationResponse `json:"destination,omitempty"`
-
-	// AvailableMethods lists available methods.
-	AvailableMethods []FulfillmentAvailableMethodResponse `json:"available_methods,omitempty"`
-}
-
-// FulfillmentGroupRequest represents a fulfillment group in a request.
-type FulfillmentGroupRequest struct {
+// FulfillmentGroupUpdateRequest represents a fulfillment group in an update request.
+type FulfillmentGroupUpdateRequest struct {
 	// ID is the group identifier.
-	ID string `json:"id,omitempty"`
+	ID string `json:"id"`
 
-	// LineItemIDs are the line items in this group.
-	LineItemIDs []string `json:"line_item_ids,omitempty"`
-
-	// Option is the selected fulfillment option.
-	Option *FulfillmentOptionRequest `json:"option,omitempty"`
+	// SelectedOptionID is the ID of the selected fulfillment option.
+	SelectedOptionID *string `json:"selected_option_id,omitempty"`
 }
 
 // FulfillmentGroupResponse represents a fulfillment group in a response.
@@ -178,89 +141,128 @@ type FulfillmentGroupResponse struct {
 	ID string `json:"id"`
 
 	// LineItemIDs are the line items in this group.
+	LineItemIDs []string `json:"line_item_ids"`
+
+	// Options are the available fulfillment options for this group.
+	Options []FulfillmentOptionResponse `json:"options,omitempty"`
+
+	// SelectedOptionID is the ID of the selected fulfillment option.
+	SelectedOptionID *string `json:"selected_option_id,omitempty"`
+}
+
+// FulfillmentMethodCreateRequest represents a fulfillment method in a create request.
+type FulfillmentMethodCreateRequest struct {
+	// Type is the fulfillment method type (shipping or pickup).
+	Type FulfillmentMethodType `json:"type"`
+
+	// LineItemIDs are the line items fulfilled via this method.
 	LineItemIDs []string `json:"line_item_ids,omitempty"`
 
-	// Option is the selected fulfillment option.
-	Option *FulfillmentOptionResponse `json:"option,omitempty"`
-}
+	// Destinations are the available destinations.
+	Destinations []FulfillmentDestinationRequest `json:"destinations,omitempty"`
 
-// FulfillmentRequest represents fulfillment data in a request.
-type FulfillmentRequest struct {
+	// SelectedDestinationID is the ID of the selected destination.
+	SelectedDestinationID *string `json:"selected_destination_id,omitempty"`
+
 	// Groups are the fulfillment groups.
-	Groups []FulfillmentGroupRequest `json:"groups,omitempty"`
-
-	// Destination is a global destination.
-	Destination *FulfillmentDestinationRequest `json:"destination,omitempty"`
-
-	// MethodID is a global method selection.
-	MethodID string `json:"method_id,omitempty"`
+	Groups []FulfillmentGroupCreateRequest `json:"groups,omitempty"`
 }
 
-// FulfillmentResponse represents fulfillment data in a response.
-type FulfillmentResponse struct {
+// FulfillmentMethodUpdateRequest represents a fulfillment method in an update request.
+type FulfillmentMethodUpdateRequest struct {
+	// ID is the method identifier.
+	ID string `json:"id"`
+
+	// LineItemIDs are the line items fulfilled via this method.
+	LineItemIDs []string `json:"line_item_ids"`
+
+	// Destinations are the available destinations.
+	Destinations []FulfillmentDestinationRequest `json:"destinations,omitempty"`
+
+	// SelectedDestinationID is the ID of the selected destination.
+	SelectedDestinationID *string `json:"selected_destination_id,omitempty"`
+
+	// Groups are the fulfillment groups.
+	Groups []FulfillmentGroupUpdateRequest `json:"groups,omitempty"`
+}
+
+// FulfillmentMethodResponse represents a fulfillment method in a response.
+type FulfillmentMethodResponse struct {
+	// ID is a unique fulfillment method identifier.
+	ID string `json:"id"`
+
+	// Type is the fulfillment method type (shipping or pickup).
+	Type FulfillmentMethodType `json:"type"`
+
+	// LineItemIDs are the line items fulfilled via this method.
+	LineItemIDs []string `json:"line_item_ids"`
+
+	// Destinations are the available destinations.
+	Destinations []FulfillmentDestinationResponse `json:"destinations,omitempty"`
+
+	// SelectedDestinationID is the ID of the selected destination.
+	SelectedDestinationID *string `json:"selected_destination_id,omitempty"`
+
 	// Groups are the fulfillment groups.
 	Groups []FulfillmentGroupResponse `json:"groups,omitempty"`
+}
 
-	// AvailableMethods lists globally available methods.
-	AvailableMethods []FulfillmentAvailableMethodResponse `json:"available_methods,omitempty"`
+// FulfillmentAvailableMethodResponse represents inventory availability for a fulfillment method.
+type FulfillmentAvailableMethodResponse struct {
+	// Type is the fulfillment method type (shipping or pickup).
+	Type FulfillmentMethodType `json:"type"`
 
-	// Destination is the global destination.
-	Destination *FulfillmentDestinationResponse `json:"destination,omitempty"`
+	// LineItemIDs are the line items available for this method.
+	LineItemIDs []string `json:"line_item_ids"`
 
-	// Method is the globally selected method.
-	Method *FulfillmentMethodResponse `json:"method,omitempty"`
+	// FulfillableOn is "now" for immediate availability, or ISO 8601 date for future.
+	FulfillableOn *string `json:"fulfillable_on,omitempty"`
+
+	// Description provides human-readable availability info.
+	Description string `json:"description,omitempty"`
 }
 
 // FulfillmentCreateRequest represents fulfillment in a checkout create request.
 type FulfillmentCreateRequest struct {
-	// Destination is the delivery destination.
-	Destination *FulfillmentDestinationRequest `json:"destination,omitempty"`
-
-	// MethodID is the selected method ID.
-	MethodID string `json:"method_id,omitempty"`
-
-	// Groups are the fulfillment groups.
-	Groups []FulfillmentGroupRequest `json:"groups,omitempty"`
+	// Methods are the fulfillment methods.
+	Methods []FulfillmentMethodCreateRequest `json:"methods,omitempty"`
 }
 
 // FulfillmentUpdateRequest represents fulfillment in a checkout update request.
 type FulfillmentUpdateRequest struct {
-	// Destination is the delivery destination.
-	Destination *FulfillmentDestinationRequest `json:"destination,omitempty"`
-
-	// MethodID is the selected method ID.
-	MethodID string `json:"method_id,omitempty"`
-
-	// Groups are the fulfillment groups.
-	Groups []FulfillmentGroupRequest `json:"groups,omitempty"`
+	// Methods are the fulfillment methods.
+	Methods []FulfillmentMethodUpdateRequest `json:"methods,omitempty"`
 }
 
-// FulfillmentEvent represents a fulfillment tracking event.
-type FulfillmentEvent struct {
-	// Timestamp is when the event occurred.
-	Timestamp *time.Time `json:"timestamp,omitempty"`
+// FulfillmentResponse represents fulfillment information in a response.
+type FulfillmentResponse struct {
+	// Methods are the fulfillment methods.
+	Methods []FulfillmentMethodResponse `json:"methods,omitempty"`
 
-	// Status is the event status.
-	Status string `json:"status,omitempty"`
+	// AvailableMethods lists inventory availability hints.
+	AvailableMethods []FulfillmentAvailableMethodResponse `json:"available_methods,omitempty"`
+}
 
-	// Description provides event details.
-	Description string `json:"description,omitempty"`
+// AllowsMultiDestination represents multi-destination configuration.
+type AllowsMultiDestination struct {
+	// Shipping indicates if multi-destination shipping is allowed.
+	Shipping bool `json:"shipping,omitempty"`
 
-	// Location is where the event occurred.
-	Location string `json:"location,omitempty"`
+	// Pickup indicates if multi-destination pickup is allowed.
+	Pickup bool `json:"pickup,omitempty"`
 }
 
 // MerchantFulfillmentConfig represents merchant fulfillment configuration.
 type MerchantFulfillmentConfig struct {
-	// SupportedMethods lists supported method types.
-	SupportedMethods []MethodType `json:"supported_methods,omitempty"`
+	// AllowsMethodCombinations specifies allowed method type combinations.
+	AllowsMethodCombinations [][]FulfillmentMethodType `json:"allows_method_combinations,omitempty"`
 
-	// PickupLocations lists available pickup locations.
-	PickupLocations []RetailLocationResponse `json:"pickup_locations,omitempty"`
+	// AllowsMultiDestination specifies multi-destination settings.
+	AllowsMultiDestination *AllowsMultiDestination `json:"allows_multi_destination,omitempty"`
 }
 
 // PlatformFulfillmentConfig represents platform fulfillment configuration.
 type PlatformFulfillmentConfig struct {
-	// PreferredMethods lists preferred method types.
-	PreferredMethods []MethodType `json:"preferred_methods,omitempty"`
+	// SupportsMultiGroup indicates if the platform supports multiple groups.
+	SupportsMultiGroup bool `json:"supports_multi_group,omitempty"`
 }

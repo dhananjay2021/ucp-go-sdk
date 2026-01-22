@@ -46,8 +46,8 @@ type ExtendedCheckoutResponse struct {
 	// LineItems are the items being checked out.
 	LineItems []models.LineItemResponse `json:"line_items"`
 
-	// Buyer contains buyer information.
-	Buyer *models.BuyerConsentResponse `json:"buyer,omitempty"`
+	// Buyer contains buyer information with consent.
+	Buyer *models.BuyerWithConsentResponse `json:"buyer,omitempty"`
 
 	// Status is the current checkout state.
 	Status models.CheckoutStatus `json:"status"`
@@ -80,19 +80,10 @@ type ExtendedCheckoutResponse struct {
 	Fulfillment *models.FulfillmentResponse `json:"fulfillment,omitempty"`
 
 	// Discounts contains applied discounts (extension).
-	Discounts []models.DiscountResponse `json:"discounts,omitempty"`
-
-	// OrderID is the order ID if order was created.
-	OrderID string `json:"order_id,omitempty"`
-
-	// OrderPermalinkURL is a URL to view the order.
-	OrderPermalinkURL string `json:"order_permalink_url,omitempty"`
+	Discounts *models.DiscountsResponse `json:"discounts,omitempty"`
 
 	// Platform contains platform configuration.
 	Platform *PlatformConfig `json:"platform,omitempty"`
-
-	// Metadata contains custom metadata.
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // ExtendedCheckoutCreateRequest combines base checkout create with extensions.
@@ -103,44 +94,41 @@ type ExtendedCheckoutCreateRequest struct {
 	// Currency is the ISO 4217 currency code.
 	Currency string `json:"currency"`
 
-	// Buyer contains buyer information (extension).
-	Buyer *models.BuyerConsentCreateRequest `json:"buyer,omitempty"`
+	// Payment contains payment information.
+	Payment models.PaymentCreateRequest `json:"payment"`
 
-	// Totals contains optional totals.
-	Totals []models.TotalCreateRequest `json:"totals,omitempty"`
+	// Buyer contains buyer information with consent (extension).
+	Buyer *models.BuyerWithConsentCreateRequest `json:"buyer,omitempty"`
 
 	// Fulfillment contains fulfillment information (extension).
 	Fulfillment *models.FulfillmentCreateRequest `json:"fulfillment,omitempty"`
 
 	// Discounts contains discount codes to apply (extension).
-	Discounts []models.DiscountCreateRequest `json:"discounts,omitempty"`
-
-	// Metadata contains optional custom metadata.
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	Discounts *models.DiscountsCreateRequest `json:"discounts,omitempty"`
 }
 
 // ExtendedCheckoutUpdateRequest combines base checkout update with extensions.
 type ExtendedCheckoutUpdateRequest struct {
-	// LineItems are updated line items.
-	LineItems []models.LineItemUpdateRequest `json:"line_items,omitempty"`
+	// ID is the unique identifier of the checkout session.
+	ID string `json:"id"`
 
-	// Buyer contains updated buyer information (extension).
-	Buyer *models.BuyerConsentUpdateRequest `json:"buyer,omitempty"`
+	// LineItems are the line items.
+	LineItems []models.LineItemUpdateRequest `json:"line_items"`
 
-	// Totals contains updated totals.
-	Totals []models.TotalCreateRequest `json:"totals,omitempty"`
+	// Currency is the ISO 4217 currency code.
+	Currency string `json:"currency"`
 
-	// Fulfillment contains updated fulfillment information (extension).
+	// Payment contains payment information.
+	Payment models.PaymentUpdateRequest `json:"payment"`
+
+	// Buyer contains buyer information with consent (extension).
+	Buyer *models.BuyerWithConsentUpdateRequest `json:"buyer,omitempty"`
+
+	// Fulfillment contains fulfillment information (extension).
 	Fulfillment *models.FulfillmentUpdateRequest `json:"fulfillment,omitempty"`
 
 	// Discounts contains discount updates (extension).
-	Discounts []models.DiscountUpdateRequest `json:"discounts,omitempty"`
-
-	// Payment contains updated payment information.
-	Payment *models.PaymentUpdateRequest `json:"payment,omitempty"`
-
-	// Metadata contains updated metadata.
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	Discounts *models.DiscountsUpdateRequest `json:"discounts,omitempty"`
 }
 
 // ExtendedOrder combines base order with extensions.
@@ -148,7 +136,7 @@ type ExtendedOrder struct {
 	models.Order
 
 	// Discounts contains applied discounts.
-	Discounts []models.DiscountResponse `json:"discounts,omitempty"`
+	Discounts *models.DiscountsResponse `json:"discounts,omitempty"`
 }
 
 // CheckoutWithFulfillmentCreateRequest is a checkout create request with fulfillment.
@@ -180,7 +168,7 @@ type CheckoutWithDiscountCreateRequest struct {
 	models.CheckoutCreateRequest
 
 	// Discounts contains discount codes to apply.
-	Discounts []models.DiscountCreateRequest `json:"discounts,omitempty"`
+	Discounts *models.DiscountsCreateRequest `json:"discounts,omitempty"`
 }
 
 // CheckoutWithDiscountUpdateRequest is a checkout update request with discounts.
@@ -188,7 +176,7 @@ type CheckoutWithDiscountUpdateRequest struct {
 	models.CheckoutUpdateRequest
 
 	// Discounts contains discount updates.
-	Discounts []models.DiscountUpdateRequest `json:"discounts,omitempty"`
+	Discounts *models.DiscountsUpdateRequest `json:"discounts,omitempty"`
 }
 
 // CheckoutWithDiscountResponse is a checkout response with discounts.
@@ -196,7 +184,7 @@ type CheckoutWithDiscountResponse struct {
 	models.CheckoutResponse
 
 	// Discounts contains applied discounts.
-	Discounts []models.DiscountResponse `json:"discounts,omitempty"`
+	Discounts *models.DiscountsResponse `json:"discounts,omitempty"`
 }
 
 // CheckoutWithBuyerConsentCreateRequest is a checkout create request with buyer consent.
@@ -204,7 +192,7 @@ type CheckoutWithBuyerConsentCreateRequest struct {
 	models.CheckoutCreateRequest
 
 	// Buyer contains buyer consent information.
-	Buyer *models.BuyerConsentCreateRequest `json:"buyer,omitempty"`
+	Buyer *models.BuyerWithConsentCreateRequest `json:"buyer,omitempty"`
 }
 
 // CheckoutWithBuyerConsentUpdateRequest is a checkout update request with buyer consent.
@@ -212,7 +200,7 @@ type CheckoutWithBuyerConsentUpdateRequest struct {
 	models.CheckoutUpdateRequest
 
 	// Buyer contains buyer consent information.
-	Buyer *models.BuyerConsentUpdateRequest `json:"buyer,omitempty"`
+	Buyer *models.BuyerWithConsentUpdateRequest `json:"buyer,omitempty"`
 }
 
 // CheckoutWithBuyerConsentResponse is a checkout response with buyer consent.
@@ -220,5 +208,5 @@ type CheckoutWithBuyerConsentResponse struct {
 	models.CheckoutResponse
 
 	// Buyer contains buyer consent information.
-	Buyer *models.BuyerConsentResponse `json:"buyer,omitempty"`
+	Buyer *models.BuyerWithConsentResponse `json:"buyer,omitempty"`
 }

@@ -26,13 +26,22 @@ import (
 	"net/http"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/dhananjay2021/ucp-go-sdk/client"
 	"github.com/dhananjay2021/ucp-go-sdk/extensions"
 	"github.com/dhananjay2021/ucp-go-sdk/models"
 	"github.com/dhananjay2021/ucp-go-sdk/server"
 )
+
+// In-memory product catalog for demo
+var productCatalog = map[string]struct {
+	Title    string
+	Price    int // cents
+	ImageURL string
+}{
+	"PROD-001": {Title: "Wireless Headphones", Price: 14999, ImageURL: "https://example.com/images/headphones.jpg"},
+	"PROD-002": {Title: "Phone Case", Price: 2999, ImageURL: "https://example.com/images/case.jpg"},
+}
 
 // In-memory storage for demo purposes
 var (
@@ -97,10 +106,13 @@ func main() {
 		},
 		PaymentHandlers: []models.PaymentHandlerResponse{
 			{
-				ID:              "default",
-				Type:            "tokenization",
-				Name:            "Demo Payment Handler",
-				TokenizationURL: fmt.Sprintf("http://localhost:%s/tokenize", port),
+				ID:                "default",
+				Name:              "dev.ucp.tokenization",
+				Version:           "2026-01-11",
+				Spec:              "https://ucp.dev/handlers/tokenization/spec",
+				ConfigSchema:      "https://ucp.dev/handlers/tokenization/config.json",
+				InstrumentSchemas: []string{"https://ucp.dev/schemas/shopping/types/card_payment_instrument.json"},
+				Config:            map[string]interface{}{"gateway": "demo"},
 			},
 		},
 	}
@@ -134,31 +146,35 @@ func main() {
 func handleCreateCheckout(r *http.Request, req *extensions.ExtendedCheckoutCreateRequest) (*extensions.ExtendedCheckoutResponse, error) {
 	checkoutID := generateID("chk")
 
-	// Calculate totals
-	var subtotal float64
+	// Calculate totals - look up items from catalog
+	var subtotal int
 	lineItems := make([]models.LineItemResponse, len(req.LineItems))
 
 	for i, li := range req.LineItems {
-		var price float64
-		fmt.Sscanf(li.Item.Price, "%f", &price)
-		itemTotal := price * float64(li.Quantity)
+		product, ok := productCatalog[li.Item.ID]
+		if !ok {
+			return nil, server.BadRequestError(fmt.Sprintf("unknown product: %s", li.Item.ID))
+		}
+
+		itemTotal := product.Price * li.Quantity
 		subtotal += itemTotal
 
 		lineItems[i] = models.LineItemResponse{
 			ID: generateID("li"),
 			Item: models.ItemResponse{
-				ID:          li.Item.ID,
-				Name:        li.Item.Name,
-				Description: li.Item.Description,
-				Price:       li.Item.Price,
-				ImageURL:    li.Item.ImageURL,
+				ID:       li.Item.ID,
+				Title:    product.Title,
+				Price:    product.Price,
+				ImageURL: product.ImageURL,
 			},
 			Quantity: li.Quantity,
 			Totals: []models.TotalResponse{
-				{Type: models.TotalTypeSubtotal, Amount: fmt.Sprintf("%.2f", itemTotal)},
+				{Type: models.TotalTypeSubtotal, Amount: itemTotal},
 			},
 		}
 	}
+
+	tax := subtotal * 875 / 10000 // 8.75% tax
 
 	// Create checkout response
 	checkout := &extensions.ExtendedCheckoutResponse{
@@ -173,21 +189,29 @@ func handleCreateCheckout(r *http.Request, req *extensions.ExtendedCheckoutCreat
 		Status:    models.CheckoutStatusIncomplete,
 		Currency:  req.Currency,
 		Totals: []models.TotalResponse{
-			{Type: models.TotalTypeSubtotal, Amount: fmt.Sprintf("%.2f", subtotal)},
-			{Type: models.TotalTypeTax, Amount: fmt.Sprintf("%.2f", subtotal*0.0875)},
-			{Type: models.TotalTypeTotal, Amount: fmt.Sprintf("%.2f", subtotal*1.0875)},
+			{Type: models.TotalTypeSubtotal, Amount: subtotal},
+			{Type: models.TotalTypeTax, Amount: tax},
+			{Type: models.TotalTypeTotal, Amount: subtotal + tax},
 		},
 		Links: []models.Link{
-			{Rel: "terms", Href: "https://example.com/terms", Title: "Terms of Service"},
-			{Rel: "privacy", Href: "https://example.com/privacy", Title: "Privacy Policy"},
+			{Type: "terms_of_service", URL: "https://example.com/terms", Title: "Terms of Service"},
+			{Type: "privacy_policy", URL: "https://example.com/privacy", Title: "Privacy Policy"},
 		},
 		Payment: models.PaymentResponse{
 			Handlers: []models.PaymentHandlerResponse{
-				{ID: "default", Type: "tokenization", Name: "Demo Payment Handler"},
+				{
+					ID:                "default",
+					Name:              "dev.ucp.tokenization",
+					Version:           "2026-01-11",
+					Spec:              "https://ucp.dev/handlers/tokenization/spec",
+					ConfigSchema:      "https://ucp.dev/handlers/tokenization/config.json",
+					InstrumentSchemas: []string{"https://ucp.dev/schemas/shopping/types/card_payment_instrument.json"},
+					Config:            map[string]interface{}{"gateway": "demo"},
+				},
 			},
 		},
 		Messages: []models.Message{
-			{Type: models.MessageTypeInfo, Title: "Buyer information required", Severity: models.SeverityRecoverable},
+			{Type: models.MessageTypeInfo, Content: "Buyer information required", Severity: models.SeverityRecoverable},
 		},
 	}
 
@@ -196,7 +220,7 @@ func handleCreateCheckout(r *http.Request, req *extensions.ExtendedCheckoutCreat
 	checkouts[checkoutID] = checkout
 	mu.Unlock()
 
-	log.Printf("Created checkout %s with %d items", checkoutID, len(lineItems))
+	log.Printf("Created checkout %s with %d items, subtotal: %d cents", checkoutID, len(lineItems), subtotal)
 	return checkout, nil
 }
 
@@ -223,31 +247,44 @@ func handleUpdateCheckout(r *http.Request, id string, req *extensions.ExtendedCh
 
 	// Update buyer info
 	if req.Buyer != nil {
-		checkout.Buyer = &models.BuyerConsentResponse{
-			Email:          req.Buyer.Email,
-			Phone:          req.Buyer.Phone,
-			FirstName:      req.Buyer.FirstName,
-			LastName:       req.Buyer.LastName,
-			BillingAddress: req.Buyer.BillingAddress,
+		checkout.Buyer = &models.BuyerWithConsentResponse{
+			Email:       req.Buyer.Email,
+			PhoneNumber: req.Buyer.PhoneNumber,
+			FirstName:   req.Buyer.FirstName,
+			LastName:    req.Buyer.LastName,
+			FullName:    req.Buyer.FullName,
+			Consent:     req.Buyer.Consent,
 		}
 	}
 
 	// Update fulfillment
-	if req.Fulfillment != nil && req.Fulfillment.Destination != nil {
-		checkout.Fulfillment = &models.FulfillmentResponse{
-			Destination: &models.FulfillmentDestinationResponse{},
-		}
-		if req.Fulfillment.Destination.Shipping != nil {
-			checkout.Fulfillment.Destination.Shipping = &models.ShippingDestinationResponse{
-				Address: req.Fulfillment.Destination.Shipping.Address,
+	if req.Fulfillment != nil && len(req.Fulfillment.Methods) > 0 {
+		methods := make([]models.FulfillmentMethodResponse, len(req.Fulfillment.Methods))
+		for i, m := range req.Fulfillment.Methods {
+			destinations := make([]models.FulfillmentDestinationResponse, len(m.Destinations))
+			for j, d := range m.Destinations {
+				destID := generateID("dest")
+				destinations[j] = models.FulfillmentDestinationResponse{
+					PostalAddress: d.PostalAddress,
+					ID:            destID,
+				}
 			}
+			methods[i] = models.FulfillmentMethodResponse{
+				ID:           m.ID,
+				Type:         models.FulfillmentMethodTypeShipping, // Default to shipping for demo
+				LineItemIDs:  m.LineItemIDs,
+				Destinations: destinations,
+			}
+		}
+		checkout.Fulfillment = &models.FulfillmentResponse{
+			Methods: methods,
 		}
 	}
 
 	// Update payment
-	if req.Payment != nil {
-		checkout.Payment.HandlerID = req.Payment.HandlerID
-		checkout.Payment.Status = "pending"
+	if req.Payment.SelectedInstrumentID != "" {
+		checkout.Payment.SelectedInstrumentID = req.Payment.SelectedInstrumentID
+		checkout.Payment.Instruments = req.Payment.Instruments
 	}
 
 	// Update status based on completeness
@@ -255,17 +292,17 @@ func handleUpdateCheckout(r *http.Request, id string, req *extensions.ExtendedCh
 	if checkout.Buyer == nil || checkout.Buyer.Email == "" {
 		checkout.Messages = append(checkout.Messages, models.Message{
 			Type:     models.MessageTypeInfo,
-			Title:    "Email required",
+			Content:  "Email required",
 			Severity: models.SeverityRecoverable,
-			Field:    "buyer.email",
+			Path:     "$.buyer.email",
 		})
 	}
-	if checkout.Payment.HandlerID == "" {
+	if checkout.Payment.SelectedInstrumentID == "" {
 		checkout.Messages = append(checkout.Messages, models.Message{
 			Type:     models.MessageTypeInfo,
-			Title:    "Payment required",
+			Content:  "Payment required",
 			Severity: models.SeverityRecoverable,
-			Field:    "payment",
+			Path:     "$.payment",
 		})
 	}
 
@@ -282,7 +319,6 @@ func handleUpdateCheckout(r *http.Request, id string, req *extensions.ExtendedCh
 func handleCompleteCheckout(r *http.Request, id string) (*extensions.ExtendedCheckoutResponse, error) {
 	// Generate order ID before acquiring lock to avoid deadlock
 	orderID := generateID("ord")
-	now := time.Now()
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -299,10 +335,14 @@ func handleCompleteCheckout(r *http.Request, id string) (*extensions.ExtendedChe
 	orderLineItems := make([]models.OrderLineItem, len(checkout.LineItems))
 	for i, li := range checkout.LineItems {
 		orderLineItems[i] = models.OrderLineItem{
-			ID:       li.ID,
-			Item:     li.Item,
-			Quantity: li.Quantity,
-			Totals:   li.Totals,
+			ID:   li.ID,
+			Item: li.Item,
+			Quantity: models.OrderLineItemQuantity{
+				Total:     li.Quantity,
+				Fulfilled: 0,
+			},
+			Totals: li.Totals,
+			Status: models.OrderLineItemStatusProcessing,
 		}
 	}
 
@@ -315,12 +355,10 @@ func handleCompleteCheckout(r *http.Request, id string) (*extensions.ExtendedChe
 		},
 		ID:           orderID,
 		CheckoutID:   id,
-		Status:       models.OrderStatusConfirmed,
-		LineItems:    orderLineItems,
-		Currency:     checkout.Currency,
-		Totals:       checkout.Totals,
-		CreatedAt:    &now,
 		PermalinkURL: fmt.Sprintf("https://example.com/orders/%s", orderID),
+		LineItems:    orderLineItems,
+		Totals:       checkout.Totals,
+		Fulfillment:  models.OrderFulfillment{},
 	}
 
 	orders[orderID] = order
@@ -330,9 +368,7 @@ func handleCompleteCheckout(r *http.Request, id string) (*extensions.ExtendedChe
 	checkout.Order = &models.OrderConfirmation{
 		ID:           orderID,
 		PermalinkURL: order.PermalinkURL,
-		CreatedAt:    &now,
 	}
-	checkout.Payment.Status = "captured"
 
 	log.Printf("Completed checkout %s, created order %s", id, orderID)
 	return checkout, nil
