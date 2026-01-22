@@ -84,14 +84,12 @@ func main() {
     checkout, err := ucpClient.CreateCheckout(ctx, &extensions.ExtendedCheckoutCreateRequest{
         LineItems: []models.LineItemCreateRequest{
             {
-                Item: models.ItemCreateRequest{
-                    Name:  "Product Name",
-                    Price: "29.99",
-                },
+                Item:     models.ItemCreateRequest{ID: "product-123"},
                 Quantity: 1,
             },
         },
         Currency: "USD",
+        Payment:  models.PaymentCreateRequest{},
     })
     if err != nil {
         log.Fatal(err)
@@ -194,8 +192,8 @@ The `models` package contains Go structs for all UCP schemas:
 - **Payment**: `PaymentResponse`, `PaymentHandlerResponse`, `CardCredential`
 - **Fulfillment**: `FulfillmentRequest`, `FulfillmentResponse`, `ShippingDestination`
 - **Order**: `Order`, `OrderLineItem`, `Adjustment`
-- **Discount**: `DiscountCreateRequest`, `DiscountResponse`
-- **Buyer Consent**: `BuyerConsentCreateRequest`, `BuyerConsentResponse`
+- **Discount**: `DiscountsCreateRequest`, `DiscountsResponse`
+- **Buyer Consent**: `BuyerWithConsentCreateRequest`, `BuyerWithConsentResponse`
 
 ## Client Package
 
@@ -277,8 +275,8 @@ The `extensions` package provides extended types that combine base schemas with 
 type ExtendedCheckoutResponse struct {
     // Base checkout fields...
     Fulfillment *FulfillmentResponse
-    Discounts   []DiscountResponse
-    Buyer       *BuyerConsentResponse
+    Discounts   *DiscountsResponse
+    Buyer       *BuyerWithConsentResponse
 }
 ```
 
@@ -324,9 +322,12 @@ go test ./...
 The models can be regenerated from UCP JSON schemas:
 
 ```bash
-# Ensure the UCP spec repository is available
-./generate_models.sh
+# Ensure the UCP spec repository is available as a sibling directory
+./scripts/generate.sh
 ```
+
+Generated types are placed in `models/generated/` for reference. The hand-written
+models in `models/` are the primary types used by the SDK.
 
 ## Contributing
 
