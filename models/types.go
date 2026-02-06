@@ -76,6 +76,26 @@ const (
 	ContentTypeMarkdown ContentType = "markdown"
 )
 
+// Context represents buyer signals for relevance and localization.
+// Context values are provisional hints - businesses SHOULD use them when
+// authoritative data (e.g., address) is absent, and MAY ignore unsupported
+// values without returning errors.
+type Context struct {
+	// AddressCountry is the country hint. Recommended to be in 2-letter ISO 3166-1
+	// alpha-2 format (e.g., "US").
+	AddressCountry string `json:"address_country,omitempty"`
+
+	// AddressRegion is the region/state hint (e.g., "CA" for California).
+	AddressRegion string `json:"address_region,omitempty"`
+
+	// PostalCode is the postal/zip code hint (e.g., "94043").
+	PostalCode string `json:"postal_code,omitempty"`
+
+	// Intent describes the buyer's purpose (e.g., "looking for a gift under $50").
+	// Informs relevance, recommendations, and personalization.
+	Intent string `json:"intent,omitempty"`
+}
+
 // TotalType represents the type of total categorization.
 type TotalType string
 

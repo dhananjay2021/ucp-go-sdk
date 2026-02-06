@@ -147,6 +147,16 @@ type EmbeddedTransport struct {
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
+// EmbeddedTransportConfig represents per-checkout configuration for embedded transport binding.
+// Allows businesses to vary ECP availability and delegations based on cart contents,
+// agent authorization, or policy.
+type EmbeddedTransportConfig struct {
+	// Delegate specifies delegations the business allows.
+	// At service-level, declares available delegations.
+	// In checkout responses, confirms accepted delegations for this session.
+	Delegate []string `json:"delegate,omitempty"`
+}
+
 // UCPService represents a service definition with transport bindings.
 type UCPService struct {
 	// Version is the service version in YYYY-MM-DD format.

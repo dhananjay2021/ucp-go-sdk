@@ -40,10 +40,11 @@ func main() {
 		merchantURL = "http://localhost:8080"
 	}
 
-	// Create a UCP client
+	// Create a UCP client with the required UCP-Agent header
 	ucpClient := client.NewClient(merchantURL,
 		client.WithAPIKey(os.Getenv("API_KEY")),
 		client.WithUserAgent("ucp-example-client/1.0"),
+		client.WithUCPAgent("https://example-platform.com/.well-known/ucp"), // Required: identifies the calling platform
 	)
 
 	ctx := context.Background()
@@ -66,6 +67,62 @@ func main() {
 		log.Fatal("Merchant does not support checkout capability")
 	}
 
+	// Optional: Use Cart for pre-purchase exploration (if supported)
+	hasCart := false
+	for _, cap := range profile.UCP.Capabilities {
+		if cap.Name == "dev.ucp.shopping.cart" {
+			hasCart = true
+			break
+		}
+	}
+
+	if hasCart {
+		fmt.Println("\n=== Cart Demo: Pre-purchase exploration ===")
+
+		// Create a cart with buyer context
+		cart, err := ucpClient.CreateCart(ctx, &models.CartCreateRequest{
+			LineItems: []models.LineItemCreateRequest{
+				{Item: models.ItemCreateRequest{ID: "PROD-001"}, Quantity: 1},
+				{Item: models.ItemCreateRequest{ID: "PROD-002"}, Quantity: 3},
+			},
+			Context: &models.Context{
+				AddressCountry: "US",
+				AddressRegion:  "CA",
+				Intent:         "comparing prices before buying",
+			},
+		})
+		if err != nil {
+			log.Printf("Cart creation failed: %v", err)
+		} else {
+			fmt.Printf("Cart ID: %s\n", cart.ID)
+			fmt.Printf("Estimated total: %d cents\n", cart.Totals[len(cart.Totals)-1].Amount)
+			for _, msg := range cart.Messages {
+				fmt.Printf("  [%s] %s\n", msg.Type, msg.Content)
+			}
+
+			// Update cart quantities
+			cart, err = ucpClient.UpdateCart(ctx, cart.ID, &models.CartUpdateRequest{
+				ID: cart.ID,
+				LineItems: []models.LineItemCreateRequest{
+					{Item: models.ItemCreateRequest{ID: "PROD-001"}, Quantity: 2}, // Changed from 1 to 2
+					{Item: models.ItemCreateRequest{ID: "PROD-002"}, Quantity: 1}, // Changed from 3 to 1
+				},
+			})
+			if err != nil {
+				log.Printf("Cart update failed: %v", err)
+			} else {
+				fmt.Printf("Updated cart total: %d cents\n", cart.Totals[len(cart.Totals)-1].Amount)
+			}
+
+			// Delete cart (we'll use checkout directly in this example)
+			if err := ucpClient.DeleteCart(ctx, cart.ID); err != nil {
+				log.Printf("Cart delete failed: %v", err)
+			} else {
+				fmt.Println("Cart deleted (proceeding to checkout)")
+			}
+		}
+	}
+
 	// Step 2: Create a checkout session
 	// Note: In UCP, the platform sends only item IDs. The merchant
 	// returns the full item details (title, price, etc.) in the response.
@@ -83,6 +140,13 @@ func main() {
 		},
 		Currency: "USD",
 		Payment:  models.PaymentCreateRequest{},
+		// Context provides buyer signals for localization and personalization
+		Context: &models.Context{
+			AddressCountry: "US",
+			AddressRegion:  "CA",
+			PostalCode:     "94043",
+			Intent:         "looking for electronics accessories",
+		},
 	})
 	if err != nil {
 		log.Fatalf("Failed to create checkout: %v", err)

@@ -84,6 +84,12 @@ type ExtendedCheckoutResponse struct {
 
 	// Platform contains platform configuration.
 	Platform *PlatformConfig `json:"platform,omitempty"`
+
+	// EmbeddedConfig provides per-checkout configuration for embedded transport binding.
+	EmbeddedConfig *models.EmbeddedTransportConfig `json:"embedded_config,omitempty"`
+
+	// Context provides buyer signals used for this checkout.
+	Context *models.Context `json:"context,omitempty"`
 }
 
 // ExtendedCheckoutCreateRequest combines base checkout create with extensions.
@@ -105,6 +111,9 @@ type ExtendedCheckoutCreateRequest struct {
 
 	// Discounts contains discount codes to apply (extension).
 	Discounts *models.DiscountsCreateRequest `json:"discounts,omitempty"`
+
+	// Context provides buyer signals for localization (country, region, postal_code, intent).
+	Context *models.Context `json:"context,omitempty"`
 }
 
 // ExtendedCheckoutUpdateRequest combines base checkout update with extensions.
@@ -129,6 +138,9 @@ type ExtendedCheckoutUpdateRequest struct {
 
 	// Discounts contains discount updates (extension).
 	Discounts *models.DiscountsUpdateRequest `json:"discounts,omitempty"`
+
+	// Context provides buyer signals for localization.
+	Context *models.Context `json:"context,omitempty"`
 }
 
 // ExtendedOrder combines base order with extensions.

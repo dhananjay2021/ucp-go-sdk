@@ -29,6 +29,9 @@ type CheckoutCreateRequest struct {
 
 	// Buyer contains optional buyer information.
 	Buyer *Buyer `json:"buyer,omitempty"`
+
+	// Context provides buyer signals for localization (country, region, postal_code, intent).
+	Context *Context `json:"context,omitempty"`
 }
 
 // CheckoutUpdateRequest represents a request to update a checkout session.
@@ -47,6 +50,9 @@ type CheckoutUpdateRequest struct {
 
 	// Buyer contains optional buyer information.
 	Buyer *Buyer `json:"buyer,omitempty"`
+
+	// Context provides buyer signals for localization.
+	Context *Context `json:"context,omitempty"`
 }
 
 // CheckoutResponse represents a checkout session response.
@@ -89,6 +95,13 @@ type CheckoutResponse struct {
 
 	// Order contains details about an order created for this checkout.
 	Order *OrderConfirmation `json:"order,omitempty"`
+
+	// EmbeddedConfig provides per-checkout configuration for embedded transport binding.
+	// Allows businesses to vary ECP availability and delegations.
+	EmbeddedConfig *EmbeddedTransportConfig `json:"embedded_config,omitempty"`
+
+	// Context provides buyer signals used for this checkout.
+	Context *Context `json:"context,omitempty"`
 }
 
 // CheckoutCompleteRequest represents a request to complete a checkout.

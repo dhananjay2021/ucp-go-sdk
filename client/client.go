@@ -41,6 +41,9 @@ const (
 
 	// OrdersPath is the orders endpoint.
 	OrdersPath = "/orders"
+
+	// CartsPath is the shopping carts endpoint.
+	CartsPath = "/carts"
 )
 
 // ClientOption is a function that configures a Client.
@@ -81,14 +84,24 @@ func WithUserAgent(userAgent string) ClientOption {
 	}
 }
 
+// WithUCPAgent sets the UCP-Agent header with the platform's profile URL.
+// This header is required on all UCP requests and identifies the calling platform.
+// Format: profile="https://platform.example/.well-known/ucp"
+func WithUCPAgent(profileURL string) ClientOption {
+	return func(c *Client) {
+		c.ucpAgentProfile = profileURL
+	}
+}
+
 // Client is a UCP REST API client.
 type Client struct {
-	baseURL     string
-	httpClient  *http.Client
-	timeout     time.Duration
-	apiKey      string
-	accessToken string
-	userAgent   string
+	baseURL         string
+	httpClient      *http.Client
+	timeout         time.Duration
+	apiKey          string
+	accessToken     string
+	userAgent       string
+	ucpAgentProfile string
 
 	// Cached discovery profile
 	profile *models.UCPProfile
@@ -161,6 +174,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body interf
 	}
 	if c.accessToken != "" {
 		req.Header.Set("Authorization", "Bearer "+c.accessToken)
+	}
+	if c.ucpAgentProfile != "" {
+		req.Header.Set("UCP-Agent", fmt.Sprintf(`profile="%s"`, c.ucpAgentProfile))
 	}
 
 	// Execute request
@@ -276,6 +292,67 @@ func (c *Client) GetOrder(ctx context.Context, id string) (*models.Order, error)
 	var resp models.Order
 	path := fmt.Sprintf("%s/%s", OrdersPath, id)
 	if err := c.doRequest(ctx, http.MethodGet, path, nil, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// CreateCart creates a new shopping cart.
+// Carts provide lightweight pre-purchase exploration with estimated pricing
+// before committing to a checkout session.
+func (c *Client) CreateCart(ctx context.Context, req *models.CartCreateRequest) (*models.CartResponse, error) {
+	var resp models.CartResponse
+	if err := c.doRequest(ctx, http.MethodPost, CartsPath, req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// GetCart retrieves a cart by ID.
+func (c *Client) GetCart(ctx context.Context, id string) (*models.CartResponse, error) {
+	var resp models.CartResponse
+	path := fmt.Sprintf("%s/%s", CartsPath, id)
+	if err := c.doRequest(ctx, http.MethodGet, path, nil, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// UpdateCart updates a cart with new items.
+// Line items are fully replaced on update.
+func (c *Client) UpdateCart(ctx context.Context, id string, req *models.CartUpdateRequest) (*models.CartResponse, error) {
+	var resp models.CartResponse
+	path := fmt.Sprintf("%s/%s", CartsPath, id)
+	if err := c.doRequest(ctx, http.MethodPatch, path, req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// DeleteCart deletes a cart.
+func (c *Client) DeleteCart(ctx context.Context, id string) error {
+	path := fmt.Sprintf("%s/%s", CartsPath, id)
+	if err := c.doRequest(ctx, http.MethodDelete, path, nil, nil); err != nil {
+		return err
+	}
+	return nil
+}
+
+// CreateCheckoutFromCart creates a checkout session from an existing cart.
+// This converts the cart to a checkout, using the cart's line_items, context, and buyer.
+func (c *Client) CreateCheckoutFromCart(ctx context.Context, cartID string, req *extensions.ExtendedCheckoutCreateRequest) (*extensions.ExtendedCheckoutResponse, error) {
+	// Create a wrapper that includes cart_id
+	type checkoutWithCart struct {
+		*extensions.ExtendedCheckoutCreateRequest
+		CartID string `json:"cart_id"`
+	}
+	wrapped := &checkoutWithCart{
+		ExtendedCheckoutCreateRequest: req,
+		CartID:                        cartID,
+	}
+
+	var resp extensions.ExtendedCheckoutResponse
+	if err := c.doRequest(ctx, http.MethodPost, CheckoutSessionsPath, wrapped, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil

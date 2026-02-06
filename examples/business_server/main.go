@@ -48,6 +48,7 @@ var productCatalog = map[string]struct {
 var (
 	checkouts = make(map[string]*extensions.ExtendedCheckoutResponse)
 	orders    = make(map[string]*models.Order)
+	carts     = make(map[string]*models.CartResponse)
 	mu        sync.RWMutex
 	idCounter atomic.Int64
 )
@@ -92,6 +93,14 @@ func main() {
 					Extends: client.CapabilityCheckout,
 				},
 			},
+			{
+				CapabilityBase: models.CapabilityBase{
+					Name:    "dev.ucp.shopping.cart",
+					Version: "2026-01-11",
+					Spec:    "https://ucp.dev/specification/cart",
+					Schema:  "https://ucp.dev/schemas/shopping/cart.json",
+				},
+			},
 		},
 		Services: models.Services{
 			client.ServiceShopping: models.UCPService{
@@ -126,6 +135,12 @@ func main() {
 	srv.HandleCompleteCheckout(handleCompleteCheckout)
 	srv.HandleCancelCheckout(handleCancelCheckout)
 	srv.HandleGetOrder(handleGetOrder)
+
+	// Register cart handlers
+	srv.HandleCreateCart(handleCreateCart)
+	srv.HandleGetCart(handleGetCart)
+	srv.HandleUpdateCart(handleUpdateCart)
+	srv.HandleDeleteCart(handleDeleteCart)
 
 	// Apply middleware
 	handler := server.Chain(srv,
@@ -402,4 +417,143 @@ func handleGetOrder(r *http.Request, id string) (*models.Order, error) {
 	}
 
 	return order, nil
+}
+
+// Cart handlers
+
+func handleCreateCart(r *http.Request, req *models.CartCreateRequest) (*models.CartResponse, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	cartID := generateID("cart")
+
+	// Build line items with pricing from catalog
+	lineItems := make([]models.LineItemResponse, 0, len(req.LineItems))
+	subtotal := 0
+
+	for _, li := range req.LineItems {
+		product, ok := productCatalog[li.Item.ID]
+		if !ok {
+			return nil, server.BadRequestError("unknown product: " + li.Item.ID)
+		}
+
+		lineTotal := product.Price * li.Quantity
+		subtotal += lineTotal
+
+		lineItems = append(lineItems, models.LineItemResponse{
+			ID:       li.Item.ID,
+			Quantity: li.Quantity,
+			Item: models.ItemResponse{
+				ID:       li.Item.ID,
+				Title:    product.Title,
+				ImageURL: product.ImageURL,
+			},
+			Totals: []models.TotalResponse{
+				{Type: models.TotalTypeSubtotal, Amount: lineTotal},
+			},
+		})
+	}
+
+	// Calculate estimated totals (no tax yet without address)
+	cart := &models.CartResponse{
+		UCP: &models.ResponseCart{
+			Schema: "https://ucp.dev/schemas/shopping/cart.json",
+		},
+		ID:        cartID,
+		LineItems: lineItems,
+		Currency:  "USD", // Determined by context or geo-IP
+		Totals: []models.TotalResponse{
+			{Type: models.TotalTypeSubtotal, Amount: subtotal},
+			{Type: models.TotalTypeTotal, Amount: subtotal}, // Estimated, no tax yet
+		},
+		Messages: []models.Message{
+			{
+				Type:    models.MessageTypeInfo,
+				Content: "Tax will be calculated at checkout with shipping address.",
+			},
+		},
+	}
+
+	// Store context if provided
+	if req.Context != nil {
+		log.Printf("Cart created with context: country=%s, region=%s, intent=%s",
+			req.Context.AddressCountry, req.Context.AddressRegion, req.Context.Intent)
+	}
+
+	carts[cartID] = cart
+	log.Printf("Created cart %s with %d items, subtotal: %d cents", cartID, len(lineItems), subtotal)
+
+	return cart, nil
+}
+
+func handleGetCart(r *http.Request, id string) (*models.CartResponse, error) {
+	mu.RLock()
+	cart, ok := carts[id]
+	mu.RUnlock()
+
+	if !ok {
+		return nil, server.NotFoundError("cart not found")
+	}
+
+	return cart, nil
+}
+
+func handleUpdateCart(r *http.Request, id string, req *models.CartUpdateRequest) (*models.CartResponse, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	cart, ok := carts[id]
+	if !ok {
+		return nil, server.NotFoundError("cart not found")
+	}
+
+	// Rebuild line items with new quantities
+	lineItems := make([]models.LineItemResponse, 0, len(req.LineItems))
+	subtotal := 0
+
+	for _, li := range req.LineItems {
+		product, ok := productCatalog[li.Item.ID]
+		if !ok {
+			return nil, server.BadRequestError("unknown product: " + li.Item.ID)
+		}
+
+		lineTotal := product.Price * li.Quantity
+		subtotal += lineTotal
+
+		lineItems = append(lineItems, models.LineItemResponse{
+			ID:       li.Item.ID,
+			Quantity: li.Quantity,
+			Item: models.ItemResponse{
+				ID:       li.Item.ID,
+				Title:    product.Title,
+				ImageURL: product.ImageURL,
+			},
+			Totals: []models.TotalResponse{
+				{Type: models.TotalTypeSubtotal, Amount: lineTotal},
+			},
+		})
+	}
+
+	// Update cart
+	cart.LineItems = lineItems
+	cart.Totals = []models.TotalResponse{
+		{Type: models.TotalTypeSubtotal, Amount: subtotal},
+		{Type: models.TotalTypeTotal, Amount: subtotal},
+	}
+
+	log.Printf("Updated cart %s, new subtotal: %d cents", id, subtotal)
+	return cart, nil
+}
+
+func handleDeleteCart(r *http.Request, id string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if _, ok := carts[id]; !ok {
+		return server.NotFoundError("cart not found")
+	}
+
+	delete(carts, id)
+	log.Printf("Deleted cart %s", id)
+	return nil
 }
