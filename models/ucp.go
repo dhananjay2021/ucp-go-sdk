@@ -147,6 +147,17 @@ type EmbeddedTransport struct {
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
+// ColorScheme represents supported color schemes for embedded checkouts.
+type ColorScheme string
+
+const (
+	// ColorSchemeLight indicates light mode.
+	ColorSchemeLight ColorScheme = "light"
+
+	// ColorSchemeDark indicates dark mode.
+	ColorSchemeDark ColorScheme = "dark"
+)
+
 // EmbeddedTransportConfig represents per-checkout configuration for embedded transport binding.
 // Allows businesses to vary ECP availability and delegations based on cart contents,
 // agent authorization, or policy.
@@ -155,6 +166,10 @@ type EmbeddedTransportConfig struct {
 	// At service-level, declares available delegations.
 	// In checkout responses, confirms accepted delegations for this session.
 	Delegate []string `json:"delegate,omitempty"`
+
+	// ColorScheme specifies color schemes the business supports.
+	// Hosts use ec_color_scheme query parameter to request a scheme from this list.
+	ColorScheme []ColorScheme `json:"color_scheme,omitempty"`
 }
 
 // UCPService represents a service definition with transport bindings.

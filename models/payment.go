@@ -42,6 +42,10 @@ type PaymentHandlerResponse struct {
 	// InstrumentSchemas is a list of URLs to schemas for validating instrument objects.
 	InstrumentSchemas []string `json:"instrument_schemas"`
 
+	// AvailableInstruments lists instrument types this handler supports, with optional constraints.
+	// When absent, every instrument should be considered available.
+	AvailableInstruments []AvailablePaymentInstrument `json:"available_instruments,omitempty"`
+
 	// Config contains handler-specific configuration.
 	Config map[string]interface{} `json:"config"`
 }
@@ -132,15 +136,40 @@ type PaymentInstrumentBase struct {
 	Credential *PaymentCredential `json:"credential,omitempty"`
 }
 
+// CardDisplay represents display information for a card payment instrument.
+type CardDisplay struct {
+	// Brand is the card brand/network (e.g., visa, mastercard, amex).
+	Brand string `json:"brand,omitempty"`
+
+	// LastDigits is the last 4 digits of the card number.
+	LastDigits string `json:"last_digits,omitempty"`
+
+	// ExpiryMonth is the card expiration month (1-12).
+	ExpiryMonth int `json:"expiry_month,omitempty"`
+
+	// ExpiryYear is the card expiration year.
+	ExpiryYear int `json:"expiry_year,omitempty"`
+
+	// Description is an optional rich text description of the card.
+	Description string `json:"description,omitempty"`
+
+	// CardArt is an optional URI to a rich image representing the card.
+	CardArt string `json:"card_art,omitempty"`
+}
+
 // CardPaymentInstrument represents a card payment instrument.
 type CardPaymentInstrument struct {
 	PaymentInstrumentBase
 
+	// Display contains display information for this card.
+	Display *CardDisplay `json:"display,omitempty"`
+
+	// Legacy flat fields for backward compatibility
 	// Brand is the card brand/network (e.g., visa, mastercard, amex).
-	Brand string `json:"brand"`
+	Brand string `json:"brand,omitempty"`
 
 	// LastDigits is the last 4 digits of the card number.
-	LastDigits string `json:"last_digits"`
+	LastDigits string `json:"last_digits,omitempty"`
 
 	// ExpiryMonth is the card expiration month.
 	ExpiryMonth int `json:"expiry_month,omitempty"`

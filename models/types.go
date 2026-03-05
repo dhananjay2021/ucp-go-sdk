@@ -65,6 +65,35 @@ const (
 	SeverityRequiresBuyerReview Severity = "requires_buyer_review"
 )
 
+// ErrorCode represents standard error codes for UCP messages.
+// Standard errors have defined semantics; freeform codes are also permitted.
+type ErrorCode string
+
+const (
+	// ErrorCodeOutOfStock indicates the item is out of stock.
+	ErrorCodeOutOfStock ErrorCode = "out_of_stock"
+
+	// ErrorCodeItemUnavailable indicates the item is not available.
+	ErrorCodeItemUnavailable ErrorCode = "item_unavailable"
+
+	// ErrorCodeAddressUndeliverable indicates the address cannot be delivered to.
+	ErrorCodeAddressUndeliverable ErrorCode = "address_undeliverable"
+
+	// ErrorCodePaymentFailed indicates payment processing failed.
+	ErrorCodePaymentFailed ErrorCode = "payment_failed"
+)
+
+// AvailablePaymentInstrument represents an instrument type available from a payment handler.
+type AvailablePaymentInstrument struct {
+	// Type is the instrument type identifier (e.g., "card", "gift_card").
+	// References an instrument schema's type constant.
+	Type string `json:"type"`
+
+	// Constraints contains optional constraints on this instrument type.
+	// Structure depends on instrument type and active capabilities.
+	Constraints map[string]interface{} `json:"constraints,omitempty"`
+}
+
 // ContentType represents the content format.
 type ContentType string
 

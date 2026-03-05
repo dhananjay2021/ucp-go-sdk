@@ -188,6 +188,9 @@ type Order struct {
 	// Fulfillment contains fulfillment expectations and events.
 	Fulfillment OrderFulfillment `json:"fulfillment"`
 
+	// Currency is the ISO 4217 currency code. MUST match the currency from the originating checkout session.
+	Currency string `json:"currency,omitempty"`
+
 	// Totals contains the order totals.
 	Totals []TotalResponse `json:"totals"`
 
