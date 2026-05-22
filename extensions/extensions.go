@@ -90,6 +90,9 @@ type ExtendedCheckoutResponse struct {
 
 	// Context provides buyer signals used for this checkout.
 	Context *models.Context `json:"context,omitempty"`
+
+	// Attribution snapshot from the originating request.
+	Attribution models.Attribution `json:"attribution,omitempty"`
 }
 
 // ExtendedCheckoutCreateRequest combines base checkout create with extensions.
@@ -114,6 +117,9 @@ type ExtendedCheckoutCreateRequest struct {
 
 	// Context provides buyer signals for localization (country, region, postal_code, intent).
 	Context *models.Context `json:"context,omitempty"`
+
+	// Attribution provides platform-emitted referral/conversion context.
+	Attribution models.Attribution `json:"attribution,omitempty"`
 }
 
 // ExtendedCheckoutUpdateRequest combines base checkout update with extensions.
@@ -141,6 +147,9 @@ type ExtendedCheckoutUpdateRequest struct {
 
 	// Context provides buyer signals for localization.
 	Context *models.Context `json:"context,omitempty"`
+
+	// Attribution provides platform-emitted referral/conversion context.
+	Attribution models.Attribution `json:"attribution,omitempty"`
 }
 
 // ExtendedOrder combines base order with extensions.

@@ -24,6 +24,13 @@ type CartCreateRequest struct {
 	// Used by merchant for pricing, availability, and currency. Falls back to geo-IP if omitted.
 	Context *Context `json:"context,omitempty"`
 
+	// Signals contains platform-provided environment data for authorization
+	// and abuse prevention (e.g., buyer IP, user agent).
+	Signals *Signals `json:"signals,omitempty"`
+
+	// Attribution provides platform-emitted referral/conversion context.
+	Attribution Attribution `json:"attribution,omitempty"`
+
 	// Buyer provides optional buyer information for personalized estimates.
 	Buyer *Buyer `json:"buyer,omitempty"`
 }
@@ -38,6 +45,12 @@ type CartUpdateRequest struct {
 
 	// Context provides updated buyer signals for localization.
 	Context *Context `json:"context,omitempty"`
+
+	// Signals contains platform-provided environment data.
+	Signals *Signals `json:"signals,omitempty"`
+
+	// Attribution provides platform-emitted referral/conversion context.
+	Attribution Attribution `json:"attribution,omitempty"`
 
 	// Buyer provides updated buyer information.
 	Buyer *Buyer `json:"buyer,omitempty"`

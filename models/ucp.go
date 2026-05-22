@@ -238,6 +238,29 @@ type ResponseOrder struct {
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
+// UCPError represents UCP metadata for error responses.
+type UCPError struct {
+	// Status is always "error" for error responses.
+	Status string `json:"status"`
+
+	// Version is the UCP protocol version.
+	Version Version `json:"version,omitempty"`
+}
+
+// ErrorResponse represents a generic error response when business logic
+// prevents resource creation or retrieval. Used when no valid resource
+// can be established.
+type ErrorResponse struct {
+	// UCP contains protocol metadata. Status MUST be "error".
+	UCP UCPError `json:"ucp"`
+
+	// Messages describes why the operation failed.
+	Messages []Message `json:"messages"`
+
+	// ContinueURL is a URL for buyer handoff or session recovery.
+	ContinueURL string `json:"continue_url,omitempty"`
+}
+
 // JWK represents a JSON Web Key for signature verification.
 type JWK struct {
 	// Kid is the key ID, referenced in signature headers.

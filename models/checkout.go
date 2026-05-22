@@ -32,6 +32,10 @@ type CheckoutCreateRequest struct {
 
 	// Context provides buyer signals for localization (country, region, postal_code, intent).
 	Context *Context `json:"context,omitempty"`
+
+	// Attribution provides platform-emitted referral/conversion context
+	// (campaign IDs, click IDs, UTM parameters).
+	Attribution Attribution `json:"attribution,omitempty"`
 }
 
 // CheckoutUpdateRequest represents a request to update a checkout session.
@@ -53,6 +57,9 @@ type CheckoutUpdateRequest struct {
 
 	// Context provides buyer signals for localization.
 	Context *Context `json:"context,omitempty"`
+
+	// Attribution provides platform-emitted referral/conversion context.
+	Attribution Attribution `json:"attribution,omitempty"`
 }
 
 // CheckoutResponse represents a checkout session response.
@@ -102,6 +109,9 @@ type CheckoutResponse struct {
 
 	// Context provides buyer signals used for this checkout.
 	Context *Context `json:"context,omitempty"`
+
+	// Attribution snapshot from the originating request.
+	Attribution Attribution `json:"attribution,omitempty"`
 }
 
 // CheckoutCompleteRequest represents a request to complete a checkout.

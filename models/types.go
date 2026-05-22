@@ -63,6 +63,10 @@ const (
 
 	// SeverityRequiresBuyerReview indicates buyer must authorize before order placement.
 	SeverityRequiresBuyerReview Severity = "requires_buyer_review"
+
+	// SeverityUnrecoverable indicates no valid resource exists to act on.
+	// Retry with a new resource or inputs.
+	SeverityUnrecoverable Severity = "unrecoverable"
 )
 
 // ErrorCode represents standard error codes for UCP messages.
@@ -81,6 +85,42 @@ const (
 
 	// ErrorCodePaymentFailed indicates payment processing failed.
 	ErrorCodePaymentFailed ErrorCode = "payment_failed"
+)
+
+// InfoCode represents standard info codes for informational messages.
+// Standard codes are defined in capability specifications; freeform codes are permitted.
+type InfoCode string
+
+const (
+	// InfoCodeIdentityOptional indicates buyer identity is optional.
+	InfoCodeIdentityOptional InfoCode = "identity_optional"
+
+	// InfoCodeSignal indicates a signal-based informational message.
+	InfoCodeSignal InfoCode = "signal"
+
+	// InfoCodeFreeShipping indicates free shipping is available.
+	InfoCodeFreeShipping InfoCode = "free_shipping"
+
+	// InfoCodeNotFound indicates the requested resource was not found.
+	InfoCodeNotFound InfoCode = "not_found"
+)
+
+// WarningCode represents standard warning codes for warning messages.
+// Standard codes are defined in capability specifications; freeform codes are permitted.
+type WarningCode string
+
+const (
+	// WarningCodeFinalSale indicates the item is final sale (no returns).
+	WarningCodeFinalSale WarningCode = "final_sale"
+
+	// WarningCodeProp65 indicates a California Proposition 65 warning.
+	WarningCodeProp65 WarningCode = "prop65"
+
+	// WarningCodeFulfillmentChanged indicates fulfillment terms have changed.
+	WarningCodeFulfillmentChanged WarningCode = "fulfillment_changed"
+
+	// WarningCodeAgeRestricted indicates the item is age-restricted.
+	WarningCodeAgeRestricted WarningCode = "age_restricted"
 )
 
 // AvailablePaymentInstrument represents an instrument type available from a payment handler.
@@ -123,6 +163,49 @@ type Context struct {
 	// Intent describes the buyer's purpose (e.g., "looking for a gift under $50").
 	// Informs relevance, recommendations, and personalization.
 	Intent string `json:"intent,omitempty"`
+
+	// Language is the preferred language using IETF BCP 47 language tags
+	// (e.g., "en", "fr-CA", "zh-Hans"). For REST, equivalent to Accept-Language header.
+	// When provided, overrides Accept-Language.
+	Language string `json:"language,omitempty"`
+
+	// Currency is the preferred currency in ISO 4217 format (e.g., "EUR", "USD").
+	// Also serves as the denomination for price filter values.
+	Currency string `json:"currency,omitempty"`
+
+	// Eligibility contains buyer claims about eligible benefits (e.g., loyalty
+	// membership, payment instrument perks). Values MUST use reverse-domain naming
+	// (e.g., "com.example.loyalty_gold", "org.school.student") and MUST be non-identifying.
+	Eligibility []string `json:"eligibility,omitempty"`
+}
+
+// Attribution represents platform-emitted referral and conversion-event context.
+// Includes campaign identifiers, click IDs, source/medium markers, etc. -
+// the same parameters platforms communicate via URL query parameters in
+// browser-based flows. Values are URL-style parameter strings.
+type Attribution map[string]string
+
+// Amount represents a non-negative monetary amount in the currency's minor unit
+// as defined by ISO 4217 (e.g., cents for USD, yen for JPY).
+type Amount int
+
+// SignedAmount represents a monetary amount that may be negative.
+// Discounts are negative, charges are positive.
+// Uses the currency's minor unit as defined by ISO 4217.
+type SignedAmount int
+
+// Signals represents environment data provided by the platform for authorization
+// and abuse prevention. Values MUST NOT be buyer-asserted claims. All signal keys
+// use reverse-domain naming (e.g., dev.ucp.buyer_ip).
+type Signals struct {
+	// BuyerIP is the client's IP address (IPv4 or IPv6).
+	BuyerIP string `json:"dev.ucp.buyer_ip,omitempty"`
+
+	// UserAgent is the client's HTTP User-Agent header or equivalent.
+	UserAgent string `json:"dev.ucp.user_agent,omitempty"`
+
+	// Additional contains any additional platform-specific signals.
+	Additional map[string]interface{} `json:"-"`
 }
 
 // TotalType represents the type of total categorization.
@@ -205,12 +288,24 @@ type Link struct {
 	Title string `json:"title,omitempty"`
 }
 
+// MessagePresentation indicates how a warning should be rendered.
+type MessagePresentation string
+
+const (
+	// MessagePresentationNotice indicates platform MUST display, MAY dismiss.
+	MessagePresentationNotice MessagePresentation = "notice"
+
+	// MessagePresentationDisclosure indicates platform MUST display in proximity
+	// to the referenced component, MUST NOT hide or auto-dismiss.
+	MessagePresentationDisclosure MessagePresentation = "disclosure"
+)
+
 // Message represents an error, warning, or info message.
 type Message struct {
 	// Type is the message type (error, warning, info).
 	Type MessageType `json:"type"`
 
-	// Code is a machine-readable error code.
+	// Code is a machine-readable error/warning code.
 	Code string `json:"code,omitempty"`
 
 	// Content is the human-readable message.
@@ -219,11 +314,21 @@ type Message struct {
 	// ContentType indicates the format of the content (plain, markdown).
 	ContentType ContentType `json:"content_type,omitempty"`
 
-	// Severity indicates who can resolve this issue.
+	// Severity indicates who can resolve this issue (for error messages).
 	Severity Severity `json:"severity,omitempty"`
 
 	// Path is the RFC 9535 JSONPath to the component this message refers to.
 	Path string `json:"path,omitempty"`
+
+	// Presentation indicates how a warning should be rendered (for warning messages).
+	// Defaults to "notice".
+	Presentation MessagePresentation `json:"presentation,omitempty"`
+
+	// ImageURL is a URL to a required visual element for warnings (e.g., warning symbol).
+	ImageURL string `json:"image_url,omitempty"`
+
+	// URL is a reference URL for more information (e.g., regulatory site, policy page).
+	URL string `json:"url,omitempty"`
 }
 
 // TotalResponse represents a total amount breakdown.
@@ -232,6 +337,7 @@ type TotalResponse struct {
 	Type TotalType `json:"type"`
 
 	// Amount is the monetary value in minor (cents) currency units.
+	// May be negative for discount types (discount, items_discount).
 	Amount int `json:"amount"`
 
 	// DisplayText is the text to display against the amount.

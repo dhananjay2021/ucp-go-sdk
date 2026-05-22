@@ -196,4 +196,7 @@ type Order struct {
 
 	// Adjustments lists order adjustments (refunds, returns, etc.).
 	Adjustments []Adjustment `json:"adjustments,omitempty"`
+
+	// Attribution is a snapshot of attribution from the originating checkout (read-only).
+	Attribution Attribution `json:"attribution,omitempty"`
 }
