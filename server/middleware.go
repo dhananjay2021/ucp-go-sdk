@@ -68,6 +68,7 @@ func CORSMiddleware(allowedOrigins []string) Middleware {
 
 			if allowed {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Add("Vary", "Origin")
 				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
 				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key, Idempotency-Key")
 				w.Header().Set("Access-Control-Max-Age", "86400")
