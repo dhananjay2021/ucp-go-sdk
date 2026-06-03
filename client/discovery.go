@@ -79,6 +79,9 @@ func GetPaymentHandler(profile *models.UCPProfile, handlerID string) *models.Pay
 // Well-known capability names.
 const (
 	CapabilityCheckout        models.CapabilityName = "dev.ucp.shopping.checkout"
+	CapabilityCart            models.CapabilityName = "dev.ucp.shopping.cart"
+	CapabilityCatalogSearch   models.CapabilityName = "dev.ucp.shopping.catalog.search"
+	CapabilityCatalogLookup   models.CapabilityName = "dev.ucp.shopping.catalog.lookup"
 	CapabilityOrder           models.CapabilityName = "dev.ucp.shopping.order"
 	CapabilityIdentityLinking models.CapabilityName = "dev.ucp.identity_linking"
 	CapabilityFulfillment     models.CapabilityName = "dev.ucp.shopping.fulfillment"

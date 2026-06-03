@@ -59,6 +59,11 @@ type Server struct {
 	getCartHandler    func(http.ResponseWriter, *http.Request)
 	updateCartHandler func(http.ResponseWriter, *http.Request)
 	deleteCartHandler func(http.ResponseWriter, *http.Request)
+
+	// Catalog Handlers
+	searchCatalogHandler func(http.ResponseWriter, *http.Request)
+	lookupCatalogHandler func(http.ResponseWriter, *http.Request)
+	getProductHandler    func(http.ResponseWriter, *http.Request)
 }
 
 // NewServer creates a new UCP server.
@@ -82,6 +87,11 @@ func NewServer(config Config) *Server {
 	s.mux.HandleFunc("GET /carts/{id}", s.handleGetCart)
 	s.mux.HandleFunc("PATCH /carts/{id}", s.handleUpdateCart)
 	s.mux.HandleFunc("DELETE /carts/{id}", s.handleDeleteCart)
+
+	// Catalog routes
+	s.mux.HandleFunc("POST /catalog/search", s.handleSearchCatalog)
+	s.mux.HandleFunc("POST /catalog/lookup", s.handleLookupCatalog)
+	s.mux.HandleFunc("POST /catalog/product", s.handleGetProduct)
 
 	return s
 }
@@ -120,6 +130,18 @@ type UpdateCartHandler func(r *http.Request, id string, req *models.CartUpdateRe
 
 // DeleteCartHandler is a function that handles cart deletion.
 type DeleteCartHandler func(r *http.Request, id string) error
+
+// SearchCatalogHandler is a function that handles catalog search requests
+// (dev.ucp.shopping.catalog.search).
+type SearchCatalogHandler func(r *http.Request, req *models.CatalogSearchRequest) (*models.CatalogSearchResponse, error)
+
+// LookupCatalogHandler is a function that handles catalog lookup requests
+// (dev.ucp.shopping.catalog.lookup).
+type LookupCatalogHandler func(r *http.Request, req *models.CatalogLookupRequest) (*models.CatalogLookupResponse, error)
+
+// GetProductHandler is a function that handles single-product lookup requests
+// (dev.ucp.shopping.catalog.lookup).
+type GetProductHandler func(r *http.Request, req *models.GetProductRequest) (*models.GetProductResponse, error)
 
 // HandleCreateCheckout registers a handler for creating checkout sessions.
 func (s *Server) HandleCreateCheckout(handler CreateCheckoutHandler) {
@@ -283,6 +305,63 @@ func (s *Server) HandleDeleteCart(handler DeleteCartHandler) {
 	}
 }
 
+// HandleSearchCatalog registers a handler for catalog search.
+func (s *Server) HandleSearchCatalog(handler SearchCatalogHandler) {
+	s.searchCatalogHandler = func(w http.ResponseWriter, r *http.Request) {
+		var req models.CatalogSearchRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			WriteError(w, http.StatusBadRequest, "invalid_request", "Failed to parse request body")
+			return
+		}
+
+		resp, err := handler(r, &req)
+		if err != nil {
+			handleError(w, err)
+			return
+		}
+
+		WriteJSON(w, http.StatusOK, resp)
+	}
+}
+
+// HandleLookupCatalog registers a handler for catalog lookup by identifiers.
+func (s *Server) HandleLookupCatalog(handler LookupCatalogHandler) {
+	s.lookupCatalogHandler = func(w http.ResponseWriter, r *http.Request) {
+		var req models.CatalogLookupRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			WriteError(w, http.StatusBadRequest, "invalid_request", "Failed to parse request body")
+			return
+		}
+
+		resp, err := handler(r, &req)
+		if err != nil {
+			handleError(w, err)
+			return
+		}
+
+		WriteJSON(w, http.StatusOK, resp)
+	}
+}
+
+// HandleGetProduct registers a handler for single-product lookup.
+func (s *Server) HandleGetProduct(handler GetProductHandler) {
+	s.getProductHandler = func(w http.ResponseWriter, r *http.Request) {
+		var req models.GetProductRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			WriteError(w, http.StatusBadRequest, "invalid_request", "Failed to parse request body")
+			return
+		}
+
+		resp, err := handler(r, &req)
+		if err != nil {
+			handleError(w, err)
+			return
+		}
+
+		WriteJSON(w, http.StatusOK, resp)
+	}
+}
+
 // Internal route handlers
 
 func (s *Server) handleDiscovery(w http.ResponseWriter, r *http.Request) {
@@ -381,5 +460,29 @@ func (s *Server) handleDeleteCart(w http.ResponseWriter, r *http.Request) {
 		s.deleteCartHandler(w, r)
 	} else {
 		WriteError(w, http.StatusNotImplemented, "not_implemented", "Cart deletion not implemented")
+	}
+}
+
+func (s *Server) handleSearchCatalog(w http.ResponseWriter, r *http.Request) {
+	if s.searchCatalogHandler != nil {
+		s.searchCatalogHandler(w, r)
+	} else {
+		WriteError(w, http.StatusNotImplemented, "not_implemented", "Catalog search not implemented")
+	}
+}
+
+func (s *Server) handleLookupCatalog(w http.ResponseWriter, r *http.Request) {
+	if s.lookupCatalogHandler != nil {
+		s.lookupCatalogHandler(w, r)
+	} else {
+		WriteError(w, http.StatusNotImplemented, "not_implemented", "Catalog lookup not implemented")
+	}
+}
+
+func (s *Server) handleGetProduct(w http.ResponseWriter, r *http.Request) {
+	if s.getProductHandler != nil {
+		s.getProductHandler(w, r)
+	} else {
+		WriteError(w, http.StatusNotImplemented, "not_implemented", "Product lookup not implemented")
 	}
 }
