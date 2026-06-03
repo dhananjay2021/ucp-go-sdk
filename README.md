@@ -30,7 +30,7 @@ validation, and client/server utilities for building UCP-compliant applications.
 
 ## Features
 
-- **Models**: Go structs for all UCP schemas (checkout, order, payment, fulfillment, etc.)
+- **Models**: Go structs for all UCP schemas (catalog, cart, checkout, order, payment, fulfillment, etc.)
 - **REST Client**: Typed HTTP client for consuming UCP APIs from platforms/agents
 - **Server Helpers**: HTTP handlers and middleware for implementing UCP endpoints
 - **Validation**: JSON Schema validation and capability negotiation
@@ -188,6 +188,8 @@ go-sdk/
 The `models` package contains Go structs for all UCP schemas:
 
 - **UCP Core**: `Version`, `CapabilityBase`, `DiscoveryProfile`, `UCPProfile`
+- **Catalog**: `Product`, `Variant`, `Price`, `CatalogSearchRequest`, `CatalogSearchResponse`, `CatalogLookupRequest`, `CatalogLookupResponse`
+- **Cart**: `CartCreateRequest`, `CartUpdateRequest`, `CartResponse`
 - **Checkout**: `CheckoutCreateRequest`, `CheckoutUpdateRequest`, `CheckoutResponse`
 - **Payment**: `PaymentResponse`, `PaymentHandlerResponse`, `CardCredential`
 - **Fulfillment**: `FulfillmentRequest`, `FulfillmentResponse`, `ShippingDestination`
