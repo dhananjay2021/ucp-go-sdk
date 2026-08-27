@@ -57,6 +57,11 @@ type Description struct {
 
 	// Markdown is the markdown-formatted description.
 	Markdown string `json:"markdown,omitempty"`
+
+	// Html is HTML-formatted content. Security: platforms MUST sanitize before
+	// rendering (strip scripts, event handlers, and untrusted elements). Treat
+	// all rich text as untrusted input. Added by the 2026-08-25 UCP release.
+	Html string `json:"html,omitempty"`
 }
 
 // Media represents a product or variant media asset (image, video, 3D model).
@@ -142,6 +147,11 @@ type Rating struct {
 type Availability struct {
 	// Available indicates whether the variant is purchasable.
 	Available bool `json:"available"`
+
+	// Status qualifies Available with fulfillment state. Well-known values:
+	// "in_stock", "backorder", "preorder", "out_of_stock", "discontinued".
+	// Added by the 2026-08-25 UCP release.
+	Status string `json:"status,omitempty"`
 }
 
 // VariantMatchType indicates how a requested identifier resolved to a variant

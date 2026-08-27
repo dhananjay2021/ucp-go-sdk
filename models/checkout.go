@@ -94,6 +94,20 @@ type CheckoutResponse struct {
 	// Messages contains error and info messages.
 	Messages []Message `json:"messages,omitempty"`
 
+	// Policies are durable business rules (e.g. return/refund terms) that apply
+	// to the items in this checkout. AppliesTo targets are relative to the
+	// response root; when absent or empty, refer to the URLs in Links. Added by
+	// the 2026-08-25 UCP release.
+	Policies []Policy `json:"policies,omitempty"`
+
+	// Actions are outstanding extension-defined Actions for this checkout, keyed
+	// by reverse-domain Action type (e.g. 3DS challenge). Added by the 2026-08-25
+	// UCP release.
+	Actions Actions `json:"actions,omitempty"`
+
+	// Signals contains platform-provided environment data echoed on the response.
+	Signals *Signals `json:"signals,omitempty"`
+
 	// ExpiresAt is the RFC 3339 expiry timestamp.
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 

@@ -34,7 +34,9 @@ type Config struct {
 	// Services are the service definitions.
 	Services models.Services
 
-	// SigningKeys are the public keys for signature verification.
+	// SigningKeys are the public keys published for signature verification. They
+	// are advertised in the discovery profile under the canonical keys[] field
+	// (UCP 2026-08-25).
 	SigningKeys []models.JWK
 
 	// PaymentHandlers are the supported payment handlers.
@@ -371,7 +373,8 @@ func (s *Server) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 			Services:     s.config.Services,
 			Capabilities: s.config.Capabilities,
 		},
-		SigningKeys: s.config.SigningKeys,
+		// Publish under the canonical keys[] field (UCP 2026-08-25, spec #566).
+		Keys: s.config.SigningKeys,
 	}
 
 	if len(s.config.PaymentHandlers) > 0 {
