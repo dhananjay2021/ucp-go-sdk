@@ -78,16 +78,34 @@ func GetPaymentHandler(profile *models.UCPProfile, handlerID string) *models.Pay
 
 // Well-known capability names.
 const (
-	CapabilityCheckout        models.CapabilityName = "dev.ucp.shopping.checkout"
-	CapabilityCart            models.CapabilityName = "dev.ucp.shopping.cart"
-	CapabilityCatalogSearch   models.CapabilityName = "dev.ucp.shopping.catalog.search"
-	CapabilityCatalogLookup   models.CapabilityName = "dev.ucp.shopping.catalog.lookup"
-	CapabilityOrder           models.CapabilityName = "dev.ucp.shopping.order"
-	CapabilityIdentityLinking models.CapabilityName = "dev.ucp.identity_linking"
-	CapabilityFulfillment     models.CapabilityName = "dev.ucp.shopping.fulfillment"
-	CapabilityDiscount        models.CapabilityName = "dev.ucp.shopping.discount"
-	CapabilityBuyerConsent    models.CapabilityName = "dev.ucp.shopping.buyer_consent"
-	CapabilityPayment         models.CapabilityName = "dev.ucp.shopping.payment"
+	CapabilityCheckout      models.CapabilityName = "dev.ucp.shopping.checkout"
+	CapabilityCart          models.CapabilityName = "dev.ucp.shopping.cart"
+	CapabilityCatalogSearch models.CapabilityName = "dev.ucp.shopping.catalog.search"
+	CapabilityCatalogLookup models.CapabilityName = "dev.ucp.shopping.catalog.lookup"
+	CapabilityOrder         models.CapabilityName = "dev.ucp.shopping.order"
+	CapabilityFulfillment   models.CapabilityName = "dev.ucp.shopping.fulfillment"
+	CapabilityDiscount      models.CapabilityName = "dev.ucp.shopping.discount"
+	CapabilityBuyerConsent  models.CapabilityName = "dev.ucp.shopping.buyer_consent"
+	CapabilityPayment       models.CapabilityName = "dev.ucp.shopping.payment"
+	CapabilityPermalink     models.CapabilityName = "dev.ucp.shopping.permalink"
+
+	// Capabilities that live in the common/ namespace as of the 2026-08-25 UCP
+	// release.
+	CapabilityIdentityLinking   models.CapabilityName = "dev.ucp.common.identity_linking"
+	CapabilityLocationSearch    models.CapabilityName = "dev.ucp.common.location.search"
+	CapabilityLocationLookup    models.CapabilityName = "dev.ucp.common.location.lookup"
+	CapabilityLoyalty           models.CapabilityName = "dev.ucp.common.loyalty"
+	CapabilityPaymentTerms      models.CapabilityName = "dev.ucp.common.payment.terms"
+	CapabilitySplitPayments     models.CapabilityName = "dev.ucp.common.payment.split_payments"
+	CapabilityPaymentAuth       models.CapabilityName = "dev.ucp.common.payment.authentication"
+	CapabilityPaymentAP2Mandate models.CapabilityName = "dev.ucp.common.payment.ap2_mandate"
+
+	// CapabilityIdentityLinkingLegacy is the pre-2026-08-25 identity linking
+	// capability name.
+	//
+	// Deprecated: use CapabilityIdentityLinking. Retained so profiles published
+	// before the namespace move still resolve.
+	CapabilityIdentityLinkingLegacy models.CapabilityName = "dev.ucp.identity_linking"
 )
 
 // Well-known service names.

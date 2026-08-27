@@ -28,15 +28,25 @@ const (
 
 	// OrderLineItemStatusFulfilled indicates the item is fully fulfilled.
 	OrderLineItemStatusFulfilled OrderLineItemStatus = "fulfilled"
+
+	// OrderLineItemStatusRemoved indicates the line item's active quantity has
+	// dropped to zero (e.g. fully returned or canceled). Added by the 2026-08-25
+	// UCP release.
+	OrderLineItemStatusRemoved OrderLineItemStatus = "removed"
 )
 
 // OrderLineItemQuantity represents quantity tracking for an order line item.
 type OrderLineItemQuantity struct {
-	// Total is the current total quantity.
+	// Total is the current active quantity after returns, cancellations, or other
+	// order changes.
 	Total int `json:"total"`
 
 	// Fulfilled is the quantity fulfilled (sum from fulfillment events).
 	Fulfilled int `json:"fulfilled"`
+
+	// Original is the quantity from the original checkout, when it differs from
+	// Total. Added by the 2026-08-25 UCP release.
+	Original *int `json:"original,omitempty"`
 }
 
 // OrderLineItem represents a line item in an order.
@@ -179,6 +189,10 @@ type Order struct {
 	// CheckoutID is the associated checkout session ID.
 	CheckoutID string `json:"checkout_id"`
 
+	// Label is an optional human-readable label for identifying the order. MUST
+	// only be provided by the business. Added by the 2026-08-25 UCP release.
+	Label string `json:"label,omitempty"`
+
 	// PermalinkURL is a permalink to access the order on merchant site.
 	PermalinkURL string `json:"permalink_url"`
 
@@ -196,6 +210,11 @@ type Order struct {
 
 	// Adjustments lists order adjustments (refunds, returns, etc.).
 	Adjustments []Adjustment `json:"adjustments,omitempty"`
+
+	// Policies are a snapshot of the policies that applied to the items at
+	// checkout, captured on the order as a durable record. AppliesTo targets are
+	// relative to the response root. Added by the 2026-08-25 UCP release.
+	Policies []Policy `json:"policies,omitempty"`
 
 	// Attribution is a snapshot of attribution from the originating checkout (read-only).
 	Attribution Attribution `json:"attribution,omitempty"`

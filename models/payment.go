@@ -56,8 +56,97 @@ type PaymentIdentity struct {
 	AccessToken string `json:"access_token"`
 }
 
+// CredentialType identifies a payment credential's on-the-wire shape.
+type CredentialType string
+
+const (
+	// CredentialTypePAN indicates a PAN credential carrying a funding primary
+	// account number (FPAN).
+	CredentialTypePAN CredentialType = "pan"
+
+	// CredentialTypeNetworkToken indicates a network token credential verified
+	// with a transaction cryptogram.
+	CredentialTypeNetworkToken CredentialType = "network_token"
+
+	// CredentialTypeCard indicates the deprecated combined card credential.
+	//
+	// Deprecated: use CredentialTypePAN or CredentialTypeNetworkToken.
+	CredentialTypeCard CredentialType = "card"
+)
+
+// PanCredential is a card credential carrying a funding primary account number
+// (FPAN). Credential selection follows the shape of the value on the wire rather
+// than its provenance: a network token surfaced in PAN form and verified with a
+// CVC is carried here, while a token verified with a discrete cryptogram uses
+// NetworkTokenCredential. This credential type MUST NOT be used for checkout,
+// only with payment handlers that tokenize or encrypt credentials.
+//
+// CRITICAL: Both parties handling a PAN credential (sender and receiver) MUST be
+// PCI DSS compliant. Transmission MUST use HTTPS/TLS with strong cipher suites.
+//
+// Introduced by UCP spec change #424 (split PAN and Network Token credentials).
+type PanCredential struct {
+	// Type is always "pan" for PAN credentials.
+	Type CredentialType `json:"type"`
+
+	// Number is the funding primary account number (FPAN).
+	Number string `json:"number"`
+
+	// ExpiryMonth is the card expiration month (1-12).
+	ExpiryMonth int `json:"expiry_month,omitempty"`
+
+	// ExpiryYear is the card expiration year.
+	ExpiryYear int `json:"expiry_year,omitempty"`
+
+	// Name is the cardholder name.
+	Name string `json:"name,omitempty"`
+
+	// CVC is the card verification code (max 4 characters).
+	CVC string `json:"cvc,omitempty"`
+}
+
+// NetworkTokenCredential is a card-network token credential verified with a
+// transaction cryptogram. The Number field carries the network token or
+// wallet-provisioned token rather than the underlying FPAN.
+//
+// Introduced by UCP spec change #424 (split PAN and Network Token credentials).
+type NetworkTokenCredential struct {
+	// Type is always "network_token" for network token credentials.
+	Type CredentialType `json:"type"`
+
+	// Number is the network token or wallet-provisioned token replacing the
+	// underlying FPAN.
+	Number string `json:"number"`
+
+	// ExpiryMonth is the token expiration month (1-12).
+	ExpiryMonth int `json:"expiry_month,omitempty"`
+
+	// ExpiryYear is the token expiration year.
+	ExpiryYear int `json:"expiry_year,omitempty"`
+
+	// Name is the cardholder name.
+	Name string `json:"name,omitempty"`
+
+	// Cryptogram is the transaction cryptogram or dynamic CVC (dCVV), in the long
+	// or short form expected by the card network or processor.
+	Cryptogram string `json:"cryptogram"`
+
+	// ECIValue is the Electronic Commerce Indicator / Security Level Indicator
+	// associated with the transaction.
+	ECIValue string `json:"eci_value,omitempty"`
+
+	// TokenRequestorID is the payment network token requestor identifier, when
+	// required by the processor or network-token program.
+	TokenRequestorID string `json:"token_requestor_id,omitempty"`
+}
+
 // CardCredential represents card payment credentials.
 // CRITICAL: Both parties handling CardCredential MUST be PCI DSS compliant.
+//
+// Deprecated: as of the 2026-08-25 UCP release the combined card credential is
+// split into PanCredential (FPAN + CVC) and NetworkTokenCredential (token +
+// cryptogram). Use those types for new code; CardCredential is retained for
+// backward compatibility.
 type CardCredential struct {
 	// Type is always "card" for card credentials.
 	Type PaymentInstrumentType `json:"type"`

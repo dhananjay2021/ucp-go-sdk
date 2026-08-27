@@ -422,8 +422,8 @@ func TestFieldNamingConventions(t *testing.T) {
 		"State",
 		"ZipCode",
 		"Country",
-		"FirstName",  // Should be snake_case
-		"LastName",   // Should be snake_case
+		"FirstName",   // Should be snake_case
+		"LastName",    // Should be snake_case
 		"PhoneNumber", // Should be snake_case
 	}
 

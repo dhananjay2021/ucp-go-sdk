@@ -1,0 +1,4112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ucp.dev/schemas/_bundle.json",
+  "$defs": {
+    "BuyerConsentExtension": {
+      "name": "dev.ucp.shopping.buyer_consent",
+      "title": "Buyer Consent Extension",
+      "description": "Extends the buyer object with per-purpose consent. Each purpose is keyed by a reverse-DNS identifier and carries the current `granted` state, the `source` of that state (business default or platform-captured buyer decision), a `description`, optional `links`, and optional `segments` for finer-grained channel, vendor, or program decisions scoped to that purpose."
+    },
+    "Cart": {
+      "name": "dev.ucp.shopping.cart",
+      "title": "Cart",
+      "description": "Shopping cart with estimated pricing before checkout. Lightweight pre-purchase exploration with no payment info or complex status states.",
+      "type": "object",
+      "required": [
+        "ucp",
+        "id",
+        "line_items",
+        "currency",
+        "totals"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "ucp": {
+          "$ref": "#/$defs/UcpCartResponseSchema",
+          "ucp_request": "omit"
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique cart identifier.",
+          "ucp_request": "omit"
+        },
+        "line_items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LineItem"
+          },
+          "description": "Cart line items. Same structure as checkout. Full replacement on update.",
+          "ucp_request": "required"
+        },
+        "context": {
+          "$ref": "#/$defs/Context",
+          "description": "Buyer signals for localization (country, region, postal_code). Merchant uses for pricing, availability, currency. Falls back to geo-IP if omitted.",
+          "ucp_request": "optional"
+        },
+        "signals": {
+          "$ref": "#/$defs/Signals",
+          "ucp_request": "optional"
+        },
+        "attribution": {
+          "$ref": "#/$defs/Attribution",
+          "ucp_request": "optional"
+        },
+        "buyer": {
+          "$ref": "#/$defs/Buyer",
+          "description": "Optional buyer information for personalized estimates.",
+          "ucp_request": "optional"
+        },
+        "currency": {
+          "type": "string",
+          "description": "ISO 4217 currency code. Determined by merchant based on context or geo-IP.",
+          "ucp_request": "omit"
+        },
+        "totals": {
+          "$ref": "#/$defs/Totals",
+          "description": "Estimated cost breakdown. May be partial if shipping/tax not yet calculable.",
+          "ucp_request": "omit"
+        },
+        "actions": {
+          "$ref": "#/$defs/Actions",
+          "description": "Outstanding extension-defined Actions for this cart.",
+          "ucp_request": "omit"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Message"
+          },
+          "description": "Validation messages, warnings, or informational notices.",
+          "ucp_request": "omit"
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Link"
+          },
+          "description": "Optional merchant links (policies, FAQs).",
+          "ucp_request": "omit"
+        },
+        "policies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Policy"
+          },
+          "description": "Policies (e.g., return/refund terms) that apply to the items in this cart. `applies_to` targets are relative to the response root; when absent or empty, refer to the URLs in `links[]`.",
+          "ucp_request": "omit"
+        },
+        "continue_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL for cart handoff and session recovery. Enables sharing and human-in-the-loop flows.",
+          "ucp_request": "omit"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Cart expiry timestamp (RFC 3339). Optional.",
+          "ucp_request": "omit"
+        }
+      }
+    },
+    "UcpCartResponseSchema": {
+      "title": "UCP Cart Response Schema",
+      "description": "UCP metadata for cart responses. No payment handlers needed pre-checkout.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/UcpBase"
+        },
+        {
+          "properties": {
+            "capabilities": {
+              "additionalProperties": {
+                "items": {
+                  "$ref": "#/$defs/CapabilityResponseSchema"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "UcpBase": {
+      "description": "Base UCP metadata with shared properties for all schema types.",
+      "type": "object",
+      "required": [
+        "version"
+      ],
+      "properties": {
+        "version": {
+          "$ref": "#/$defs/UcpVersion"
+        },
+        "map_order": {
+          "$ref": "#/$defs/UcpMapOrder",
+          "description": "Preferred key-traversal order for sibling registry fields inside the root `ucp` envelope (`services`, `capabilities`, and `payment_handlers`).",
+          "ucp_request": "omit"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "success",
+            "error"
+          ],
+          "default": "success",
+          "description": "Application-level status of the UCP operation."
+        },
+        "services": {
+          "type": "object",
+          "description": "Service registry keyed by reverse-domain name.",
+          "propertyNames": {
+            "$ref": "#/$defs/ReverseDomainName"
+          },
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/ServiceBase"
+            }
+          }
+        },
+        "capabilities": {
+          "type": "object",
+          "description": "Capability registry keyed by reverse-domain name.",
+          "propertyNames": {
+            "$ref": "#/$defs/ReverseDomainName"
+          },
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/CapabilityBase"
+            }
+          }
+        },
+        "payment_handlers": {
+          "type": "object",
+          "description": "Payment handler registry keyed by reverse-domain name.",
+          "propertyNames": {
+            "$ref": "#/$defs/ReverseDomainName"
+          },
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/PaymentHandlerBase"
+            }
+          }
+        }
+      }
+    },
+    "UcpVersion": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "Version identifier in YYYY-MM-DD format."
+    },
+    "UcpMapOrder": {
+      "type": "object",
+      "description": "Preferred key order for map-valued fields in the scope annotated by the containing `ucp` member. Each property names a target map, and its array lists target keys in preferred order. Lists may be partial and are not allowlists.",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "ReverseDomainName": {
+      "title": "Reverse Domain Name",
+      "description": "Reverse-domain identifier used for collision-safe namespacing of capabilities, services, handlers, eligibility claims, and extension-contributed keys. Must contain at least two dot-separated segments (e.g., 'dev.ucp.shopping.checkout', 'com.example.loyalty_gold'). Segments after the first are domain- or identifier-derived: they may contain interior hyphens, may start with a digit, and may contain underscores (e.g., 'com.example-shop.checkout', 'com.2example.cart', 'dev.ucp.common.identity_linking'), but must not start or end with a hyphen. The first segment (the reversed top-level domain) is letters and digits, and may contain interior hyphens to support internationalized (punycode) top-level domains such as 'xn--p1ai'.",
+      "type": "string",
+      "pattern": "^[a-z](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9_-]*[a-z0-9_])?)+$",
+      "examples": [
+        "dev.ucp.shopping.checkout",
+        "dev.ucp.common.identity_linking",
+        "com.example.loyalty_gold",
+        "com.example-shop.checkout",
+        "com.2example.cart",
+        "uk.co.example-shop.checkout",
+        "xn--p1ai.example.checkout"
+      ]
+    },
+    "ServiceBase": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/UcpEntity"
+        },
+        {
+          "type": "object",
+          "required": [
+            "transport"
+          ],
+          "properties": {
+            "transport": {
+              "type": "string",
+              "enum": [
+                "rest",
+                "mcp",
+                "a2a",
+                "embedded"
+              ],
+              "description": "Transport protocol for this service binding."
+            },
+            "endpoint": {
+              "type": "string",
+              "format": "uri",
+              "description": "Endpoint URL for this transport binding."
+            }
+          }
+        }
+      ]
+    },
+    "UcpEntity": {
+      "type": "object",
+      "description": "Shared foundation for all UCP entities.",
+      "required": [
+        "version"
+      ],
+      "properties": {
+        "version": {
+          "$ref": "#/$defs/UcpVersion",
+          "description": "Entity version in YYYY-MM-DD format."
+        },
+        "spec": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to human-readable specification document."
+        },
+        "schema": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to JSON Schema defining this entity's structure and payloads."
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for this entity instance. Used to disambiguate when multiple instances exist."
+        },
+        "config": {
+          "type": "object",
+          "description": "Entity-specific configuration. Structure defined by each entity's schema.",
+          "additionalProperties": true
+        }
+      }
+    },
+    "CapabilityBase": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/UcpEntity"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "extends": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/ReverseDomainName"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/ReverseDomainName"
+                  },
+                  "minItems": 1
+                }
+              ],
+              "description": "Parent capability(s) this extends. Present for extensions, absent for root capabilities. Use array for multi-parent extensions."
+            }
+          }
+        }
+      ]
+    },
+    "PaymentHandlerBase": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/UcpEntity"
+        },
+        {
+          "type": "object",
+          "required": [
+            "id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "available_instruments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/AvailablePaymentInstrument"
+              },
+              "description": "Instrument types this handler supports, with optional constraints. When absent, every instrument should be considered available.",
+              "minItems": 1
+            }
+          }
+        }
+      ]
+    },
+    "AvailablePaymentInstrument": {
+      "title": "Available Payment Instrument",
+      "description": "An instrument type available from a payment handler with optional constraints.",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "The instrument type identifier (e.g., 'card', 'gift_card'). References an instrument schema's type constant."
+        },
+        "constraints": {
+          "$ref": "#/$defs/ConstraintExpression",
+          "description": "A Constraint Expression describing the instrument this entry makes available. Keys in `properties` name members of the `constraint_target` declared by the instrument schema for this `type`. Requirements on submitted request data belong in `ucp.request_constraints` instead."
+        }
+      }
+    },
+    "ConstraintExpression": {
+      "title": "Constraint Expression",
+      "description": "A closed JSON Schema Draft 2020-12 constraint expression with Object and Value Constraint positions.",
+      "type": "object",
+      "properties": {
+        "required": {
+          "type": "array",
+          "description": "Property names required by the constrained object. Must be non-empty: an empty array applies no constraint.",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "properties": {
+          "type": "object",
+          "description": "Constraints keyed by property name. Must be non-empty: an empty object applies no constraint.",
+          "minProperties": 1,
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ConstraintExpression"
+              },
+              {
+                "$ref": "#/$defs/ConstraintExpressionValueConstraint"
+              }
+            ]
+          }
+        },
+        "anyOf": {
+          "type": "array",
+          "description": "Alternative Object Constraints. The constrained object must satisfy at least one. A branch must be non-empty: an empty branch is satisfied by every object and neutralizes the alternation.",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/ConstraintExpression",
+            "minProperties": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConstraintExpressionValueConstraint": {
+      "type": "object",
+      "description": "A Value Constraint containing `enum`, `const`, or both.",
+      "anyOf": [
+        {
+          "required": [
+            "enum"
+          ]
+        },
+        {
+          "required": [
+            "const"
+          ]
+        }
+      ],
+      "properties": {
+        "enum": {
+          "type": "array",
+          "description": "A non-empty array of unique JSON values.",
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "const": {}
+      },
+      "additionalProperties": false
+    },
+    "CapabilityResponseSchema": {
+      "title": "Capability (Response Schema)",
+      "description": "Capability reference in responses. Only name/version required to confirm active capabilities.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/CapabilityBase"
+        }
+      ]
+    },
+    "LineItem": {
+      "title": "Line Item",
+      "type": "object",
+      "description": "Line item object. Expected to use the currency of the parent object.",
+      "required": [
+        "id",
+        "item",
+        "quantity",
+        "totals"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "ucp_request": {
+            "create": "omit",
+            "update": "optional"
+          }
+        },
+        "item": {
+          "$ref": "#/$defs/Item"
+        },
+        "quantity": {
+          "type": "integer",
+          "description": "Always an integer step count. On Platform requests, steps use the item's Business-authoritative sale basis; omitting `item.quantity_unit` makes no assertion and does not imply `each`. On Business responses, `item.quantity_unit` describes the basis; if absent, it encodes the `each` machine identity (`C62`, 0) and `quantity` counts whole items.",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "totals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Total"
+          },
+          "description": "Line item totals breakdown.",
+          "ucp_request": "omit"
+        },
+        "parent_id": {
+          "type": "string",
+          "description": "Parent line item identifier for any nested structures.",
+          "ucp_request": {
+            "create": "omit",
+            "update": "optional"
+          }
+        }
+      }
+    },
+    "Item": {
+      "title": "Item",
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "price"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The product identifier, often the SKU, required to resolve the product details associated with this line item. Should be recognized by both the Platform, and the Business."
+        },
+        "title": {
+          "type": "string",
+          "description": "Product title.",
+          "ucp_request": "omit"
+        },
+        "price": {
+          "$ref": "#/$defs/Amount",
+          "description": "Unit price in ISO 4217 minor units. Price is the amount per one whole `quantity_unit.unit` (for example, per lb or per hour); when `quantity_unit` is absent, it is per `each`.",
+          "ucp_request": "omit"
+        },
+        "quantity_unit": {
+          "$ref": "#/$defs/QuantityUnit",
+          "description": "Sale basis this item's `quantity` is denominated in. On an authoritative Business response, absence encodes the default `each` machine identity (`C62`, 0); the Business MUST include this descriptor for every non-`each` response. On Platform requests, omission makes no assertion: the Business interprets `quantity` using the item's authoritative sale basis. If the Platform includes this descriptor, it asserts the unit-descriptor machine identity. The Business MUST compare that machine identity (`unit`, effective `scale`), ignore `display_text` and `increment`, and resolve a mismatch by conversion surfaced as a visible line revision with a warning, or by rejection with a recoverable business outcome; silent reinterpretation is forbidden. An explicit `C62` descriptor at effective scale 0 matches an authoritative basis represented by an absent descriptor.",
+          "ucp_request": "optional"
+        },
+        "unit_price": {
+          "$ref": "#/$defs/UnitPrice",
+          "description": "Pricing basis for this item. On an authoritative Business response, the Business MUST include `unit_price` on every line whose pricing basis differs from its sale basis (for example, priced per pound but sold per `each`); presence on a line marks the rate as transactional rather than display-only. When the pricing basis is the sale basis, `item.price` fully denominates the charge and this field MAY be omitted.",
+          "ucp_request": "omit"
+        },
+        "image_url": {
+          "type": "string",
+          "description": "Product image URI.",
+          "format": "uri",
+          "ucp_request": "omit"
+        }
+      }
+    },
+    "Amount": {
+      "title": "Amount",
+      "description": "Monetary amount in the currency's minor unit as defined by ISO 4217. Refer to the currency's exponent to determine minor-to-major ratio (e.g., 2 for USD, 0 for JPY, 3 for KWD).",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "QuantityUnit": {
+      "title": "Quantity Unit",
+      "description": "Sale-basis descriptor for quantities: the shared unit descriptor plus the Business's ordering policy. Its unit-descriptor machine identity remains (`unit`, effective `scale`); `display_text` and `increment` are excluded from identity and mismatch comparison.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/Unit"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "increment": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "description": "Ordering granularity, denominated in steps: the Business sells this item in integer multiples of `increment` steps. Its effective value is the provided value or 1. Advisory merchandising policy, not a representational bound: Platform-authored quantities SHOULD be integer multiples of the effective increment; the Business MAY accept, revise, or reject an off-increment request with a recoverable business outcome and MUST NOT silently reinterpret it. Business-authored quantities (checkout revisions, fulfillment events, adjustments) are bounded only by `scale`."
+            }
+          }
+        }
+      ]
+    },
+    "Unit": {
+      "title": "Unit",
+      "description": "A reusable unit descriptor for quantities and measures. Its unit-descriptor machine identity is (`unit`, effective `scale`), where effective `scale` is the provided `scale` or 0; `display_text` is excluded.",
+      "type": "object",
+      "required": [
+        "unit",
+        "display_text"
+      ],
+      "properties": {
+        "unit": {
+          "type": "string",
+          "description": "Stable machine identifier. The Business SHOULD use the exact UN/CEFACT Rec20 Common Code when one accurately identifies the unit. Otherwise, the Business MAY use a custom unit identifier and MUST use it consistently for the same unit. The Platform MUST treat an unrecognized identifier as opaque."
+        },
+        "scale": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15,
+          "default": 0,
+          "description": "One step equals `10^-scale` of `unit`. When `unit` is `C62`, `scale`, if present, MUST be 0. The maximum of 15 is derived from the interoperable integer range: at scale 16 a single whole unit (10^16 steps) is no longer representable, so larger scales cannot denominate one unit of their own basis. Businesses needing finer granularity use a smaller unit."
+        },
+        "display_text": {
+          "type": "string",
+          "description": "Required printable unit label provided by the Business. The Platform MUST use it when it does not recognize `unit`; for a recognized UN/CEFACT Rec 20 Common Code, the Platform MAY substitute its own localized label. It does not participate in unit identity or mismatch comparison."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "unit": {
+                "const": "C62"
+              }
+            },
+            "required": [
+              "unit"
+            ]
+          },
+          "then": {
+            "properties": {
+              "scale": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "UnitPrice": {
+      "title": "Unit Price",
+      "description": "Price per standard unit of measurement. MAY be omitted when unit pricing does not apply. `unit_price.currency` MUST equal `price.currency`; the comparator MUST NOT perform currency conversion. `measure.unit` and `reference.unit` MUST be identical; cross-unit conversion is not permitted. Their scales MAY differ; each value represents `value \u00d7 10^-scale`.",
+      "type": "object",
+      "required": [
+        "amount",
+        "currency",
+        "measure",
+        "reference"
+      ],
+      "properties": {
+        "amount": {
+          "$ref": "#/$defs/Amount",
+          "description": "Unit price in ISO 4217 minor units. After satisfying the same-unit invariant, the Business MUST compute the comparator as `(price.amount / (measure.value \u00d7 10^-measure.scale)) \u00d7 (reference.value \u00d7 10^-reference.scale)` and round it once to ISO 4217 minor units according to its pricing rules. The returned `unit_price.amount` is authoritative; the Platform MUST NOT recompute or substitute its own result."
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$",
+          "description": "ISO 4217 currency code."
+        },
+        "measure": {
+          "description": "Product quantity in packaging/content (for example, a 750 mL bottle), distinct from `quantity_unit`, which defines the sale basis. Its integer `value` MUST be at least 1.",
+          "allOf": [
+            {
+              "$ref": "#/$defs/Measure"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "minimum": 1
+                }
+              }
+            }
+          ]
+        },
+        "reference": {
+          "description": "Denominator for unit price display (for example, per 100 mL or per 1 kg). Its integer `value` MUST be at least 1.",
+          "allOf": [
+            {
+              "$ref": "#/$defs/Measure"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "minimum": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Measure": {
+      "title": "Measure",
+      "description": "A measure composed of an integer value and a unit descriptor. Its value is the integer count of `10^-scale` units of `unit`.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/Unit"
+        },
+        {
+          "type": "object",
+          "required": [
+            "value"
+          ],
+          "properties": {
+            "value": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "Integer count of `10^-scale` units of `unit`."
+            }
+          }
+        }
+      ]
+    },
+    "Total": {
+      "title": "Total",
+      "description": "A cost breakdown entry with a category, amount, and optional display text.",
+      "type": "object",
+      "required": [
+        "type",
+        "amount"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Cost category. Well-known values: subtotal, items_discount, discount, fulfillment, tax, fee, total. Businesses MAY use additional values.",
+          "ucp_request": "omit"
+        },
+        "display_text": {
+          "type": "string",
+          "description": "Text to display against the amount. Should reflect appropriate method (e.g., 'Shipping', 'Delivery').",
+          "ucp_request": "omit"
+        },
+        "amount": {
+          "$ref": "#/$defs/SignedAmount",
+          "ucp_request": "omit"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "discount",
+                  "items_discount"
+                ]
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "amount": {
+                "exclusiveMaximum": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "subtotal",
+                  "fulfillment",
+                  "tax",
+                  "fee"
+                ]
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "amount": {
+                "minimum": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "SignedAmount": {
+      "title": "Signed Amount",
+      "description": "Monetary amount in the currency's minor unit as defined by ISO 4217. Refer to the currency's exponent to determine minor-to-major ratio (e.g., 2 for USD, 0 for JPY, 3 for KWD). May be negative \u2014 the sign is intrinsic to the value (e.g., discounts are negative, charges are positive).",
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "Context": {
+      "title": "Context",
+      "description": "Provisional buyer signals for relevance and localization\u2014not authoritative data. Businesses SHOULD use these values when verified inputs (e.g., shipping address) are absent, and MAY ignore or down-rank them if inconsistent with higher-confidence signals (authenticated account, risk detection) or regulatory constraints (export controls). Eligibility and policy enforcement MUST occur at checkout time using binding transaction data. Context SHOULD be non-identifying and can be disclosed progressively\u2014coarse signals early, finer resolution as the session progresses. Higher-resolution data (shipping address, billing address) supersedes context.",
+      "type": "object",
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/Locality"
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "Stable, opaque identifier for a Location in the Business's namespace. This provisional, non-binding hint is distinct from the Buyer's locality. The operation specification or an active capability/extension defines its effects. A common example in retail shopping is the default home store ID selected and saved by the user when purchasing groceries."
+            },
+            "intent": {
+              "type": "string",
+              "description": "Background context describing buyer's intent (e.g., 'looking for a gift under $50', 'need something durable for outdoor use'). Informs relevance, recommendations, and personalization."
+            },
+            "language": {
+              "type": "string",
+              "description": "Preferred language for content. Use IETF BCP 47 language tags (e.g., 'en', 'fr-CA', 'zh-Hans'). For REST, equivalent to Accept-Language header\u2014platforms SHOULD fall back to Accept-Language when this field is absent; when provided, overrides Accept-Language. Businesses MAY return content in a different language if unavailable."
+            },
+            "currency": {
+              "type": "string",
+              "description": "Preferred currency (ISO 4217, e.g., 'EUR', 'USD'). Businesses determine presentment currency from context and authoritative signals; this hint MAY inform selection in multi-currency markets. Also serves as the denomination for price filter values \u2014 platforms SHOULD include this field when sending price filters. Response prices include explicit currency confirming the resolution."
+            },
+            "eligibility": {
+              "type": "array",
+              "description": "Buyer claims about eligible benefits such as loyalty membership, payment instrument perks, and similar. Recognized claims MAY inform the Business response (e.g., member-only product availability, adjusted pricing in catalog, provisional discounts at cart or checkout). Businesses MUST ignore unrecognized values without error. Values MUST use reverse-domain naming (e.g., 'com.example.loyalty_gold', 'org.school.student') and MUST be non-identifying.",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/ReverseDomainName"
+              }
+            },
+            "payment": {
+              "type": "array",
+              "description": "Buyer-preferred payment handlers in priority order (most preferred first). Each entry names a handler advertised in the Business profile's `ucp.payment_handlers`, optionally narrowed to preferred instrument types. The Business SHOULD use it to preselect or prioritize the handler (and type, when given) and MAY ignore unavailable or ineligible entries; unrecognized values MUST be ignored without error.",
+              "items": {
+                "type": "object",
+                "required": [
+                  "handler"
+                ],
+                "properties": {
+                  "handler": {
+                    "$ref": "#/$defs/ReverseDomainName",
+                    "description": "Handler registry key advertised in the Business profile's `ucp.payment_handlers`."
+                  },
+                  "types": {
+                    "type": "array",
+                    "description": "Optional preferred instrument types for this handler, in priority order, aligned with the handler's advertised `payment_instrument.type` values (for example `card` or `bank`). Unrecognized values MUST be ignored.",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Locality": {
+      "title": "Locality",
+      "description": "A coarse geographic location \u2014 country, region, and postal code. A lightweight alternative to a full postal address.",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "address_country": {
+          "type": "string",
+          "description": "The country, as a 2-letter ISO 3166-1 alpha-2 code (e.g. \"US\"). A 3-letter alpha-3 code or full country name MAY also be used."
+        },
+        "address_region": {
+          "type": "string",
+          "description": "The first-level administrative region within the country (e.g. a state or province such as California)."
+        },
+        "postal_code": {
+          "type": "string",
+          "description": "The postal code (e.g. \"94043\")."
+        }
+      }
+    },
+    "Signals": {
+      "title": "Signals",
+      "description": "Environment data provided by the platform to support authorization and abuse prevention. Values MUST NOT be buyer-asserted claims \u2014 platforms provide signals based on direct observation or independently verifiable third-party attestations. All signal keys MUST use reverse-domain naming to ensure provenance and prevent collisions when multiple extensions contribute to the shared namespace.",
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/ReverseDomainName",
+        "description": "Reverse-domain identifier (e.g., dev.ucp.buyer_ip, com.example.device_id)."
+      },
+      "properties": {
+        "dev.ucp.buyer_ip": {
+          "type": "string",
+          "description": "Client's IP address (IPv4 or IPv6)."
+        },
+        "dev.ucp.user_agent": {
+          "type": "string",
+          "description": "Client's HTTP User-Agent header or equivalent."
+        }
+      },
+      "additionalProperties": true
+    },
+    "Attribution": {
+      "title": "Attribution",
+      "description": "Platform-emitted referral and conversion-event context \u2014 campaign identifiers, click IDs, source/medium markers, etc. The same parameters platforms communicate via URL query parameters in browser-based flows.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "description": "URL-style parameter value, encoded as a string. Numeric or boolean values MUST be string-encoded as they would be in a URL query string."
+      }
+    },
+    "Buyer": {
+      "title": "Buyer",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "first_name": {
+          "type": "string",
+          "description": "First name of the buyer."
+        },
+        "last_name": {
+          "type": "string",
+          "description": "Last name of the buyer."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email of the buyer."
+        },
+        "phone_number": {
+          "type": "string",
+          "description": "E.164 standard."
+        }
+      }
+    },
+    "Totals": {
+      "title": "Totals",
+      "description": "Pricing breakdown provided by the business. MUST contain exactly one subtotal and one total entry. Detail types (tax, fee, discount, fulfillment) may appear multiple times for itemization. Platforms MUST render all entries in order using display_text and amount.",
+      "type": "array",
+      "items": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/Total"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "lines": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "display_text",
+                    "amount"
+                  ],
+                  "properties": {
+                    "display_text": {
+                      "type": "string",
+                      "description": "Human-readable label for this sub-line."
+                    },
+                    "amount": {
+                      "$ref": "#/$defs/SignedAmount"
+                    }
+                  },
+                  "description": "Sub-line entry. Additional metadata MAY be included."
+                },
+                "description": "Optional itemized breakdown. The parent entry is always rendered; lines are supplementary. Sum of line amounts MUST equal the parent entry amount.",
+                "ucp_request": "omit"
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "not": {
+                    "enum": [
+                      "subtotal",
+                      "items_discount",
+                      "discount",
+                      "fulfillment",
+                      "tax",
+                      "fee",
+                      "total"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "then": {
+              "required": [
+                "display_text"
+              ]
+            }
+          }
+        ]
+      },
+      "allOf": [
+        {
+          "contains": {
+            "properties": {
+              "type": {
+                "const": "subtotal"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "type": {
+                "const": "total"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ]
+    },
+    "Actions": {
+      "title": "Actions",
+      "description": "Outstanding extension-defined Action instances, keyed by reverse-domain Action type, not extension name.",
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/ReverseDomainName"
+      },
+      "additionalProperties": {
+        "type": "array",
+        "description": "Non-empty instances of one Action type. JSON preserves array order; the declaring extension defines whether order has processing semantics.",
+        "minItems": 1,
+        "items": {
+          "$ref": "#/$defs/ActionsInstance"
+        }
+      }
+    },
+    "ActionsInstance": {
+      "type": "object",
+      "description": "Common fields for one outstanding Action instance are id and optional config. The extension declaring the Action type defines type-specific processing data under config. Additional properties are permitted for forward compatibility.",
+      "required": [
+        "id"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Identifier for this Action instance.",
+          "ucp_request": "omit"
+        },
+        "config": {
+          "type": "object",
+          "description": "Configuration defined by the extension that declares this Action type.",
+          "additionalProperties": true,
+          "ucp_request": "omit"
+        }
+      }
+    },
+    "Message": {
+      "title": "Message",
+      "type": "object",
+      "description": "Container for error, warning, or info messages.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/MessageError"
+        },
+        {
+          "$ref": "#/$defs/MessageWarning"
+        },
+        {
+          "$ref": "#/$defs/MessageInfo"
+        }
+      ]
+    },
+    "MessageError": {
+      "title": "Message Error",
+      "type": "object",
+      "required": [
+        "type",
+        "code",
+        "content",
+        "severity"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "error",
+          "description": "Message type discriminator."
+        },
+        "code": {
+          "$ref": "#/$defs/ErrorCode"
+        },
+        "path": {
+          "type": "string",
+          "description": "RFC 9535 JSONPath to the component the message refers to (e.g., $.line_items[0])."
+        },
+        "content_type": {
+          "type": "string",
+          "enum": [
+            "plain",
+            "markdown"
+          ],
+          "default": "plain",
+          "description": "Content format, default = plain."
+        },
+        "content": {
+          "type": "string",
+          "description": "Human-readable message."
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "recoverable",
+            "requires_buyer_input",
+            "requires_buyer_review",
+            "unrecoverable"
+          ],
+          "description": "Reflects the resource state and recommended action. 'recoverable': platform can resolve the condition in band, for example by modifying inputs or processing a related Action, and submit a new operation when needed. 'requires_buyer_input': merchant requires information their API doesn't support collecting programmatically (checkout incomplete). 'requires_buyer_review': buyer must authorize before order placement due to policy, regulatory, or entitlement rules. 'unrecoverable': no valid resource exists to act on, retry with new resource or inputs. Errors with 'requires_*' severity contribute to 'status: requires_escalation'."
+        }
+      }
+    },
+    "ErrorCode": {
+      "title": "Error Code",
+      "description": "Error code identifying the type of error. Standard errors are defined in capability specifications (see examples) and have standardized semantics; freeform codes are permitted.",
+      "type": "string",
+      "examples": [
+        "not_found",
+        "out_of_stock",
+        "item_unavailable",
+        "address_undeliverable",
+        "payment_failed",
+        "eligibility_invalid",
+        "identity_required",
+        "insufficient_scope"
+      ]
+    },
+    "MessageWarning": {
+      "title": "Message Warning",
+      "type": "object",
+      "required": [
+        "type",
+        "code",
+        "content"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "warning",
+          "description": "Message type discriminator."
+        },
+        "path": {
+          "type": "string",
+          "description": "RFC 9535 JSONPath to the component the message refers to (e.g., $.line_items[0])."
+        },
+        "code": {
+          "$ref": "#/$defs/WarningCode"
+        },
+        "content": {
+          "type": "string",
+          "description": "Human-readable warning message that MUST be displayed."
+        },
+        "content_type": {
+          "type": "string",
+          "enum": [
+            "plain",
+            "markdown"
+          ],
+          "default": "plain",
+          "description": "Content format, default = plain."
+        },
+        "presentation": {
+          "type": "string",
+          "default": "notice",
+          "description": "Rendering contract for this warning. 'notice' (default): platform MUST display, MAY dismiss. 'disclosure': platform MUST display in proximity to the path-referenced component, MUST NOT hide or auto-dismiss. See specification for full contract."
+        },
+        "image_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to a required visual element (e.g., warning symbol, energy class label)."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Reference URL for more information (e.g., regulatory site, registry entry, policy page)."
+        }
+      }
+    },
+    "WarningCode": {
+      "title": "Warning Code",
+      "description": "Warning code identifying the type of warning. Standard codes are defined in capability specifications (see examples) and have standardized semantics; freeform codes are permitted.",
+      "type": "string",
+      "examples": [
+        "final_sale",
+        "prop65",
+        "fulfillment_changed",
+        "payment_term_changed",
+        "age_restricted"
+      ]
+    },
+    "MessageInfo": {
+      "title": "Message Info",
+      "type": "object",
+      "required": [
+        "type",
+        "content"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "info",
+          "description": "Message type discriminator."
+        },
+        "path": {
+          "type": "string",
+          "description": "RFC 9535 JSONPath to the component the message refers to (e.g., $.line_items[0])."
+        },
+        "code": {
+          "$ref": "#/$defs/InfoCode"
+        },
+        "content_type": {
+          "type": "string",
+          "enum": [
+            "plain",
+            "markdown"
+          ],
+          "default": "plain",
+          "description": "Content format, default = plain."
+        },
+        "content": {
+          "type": "string",
+          "description": "Human-readable message."
+        }
+      }
+    },
+    "InfoCode": {
+      "title": "Info Code",
+      "description": "Info code identifying the type of informational message. Standard codes are defined in capability specifications (see examples) and have standardized semantics; freeform codes are permitted.",
+      "type": "string",
+      "examples": [
+        "identity_optional",
+        "signal",
+        "free_shipping",
+        "not_found"
+      ]
+    },
+    "Link": {
+      "title": "Link",
+      "type": "object",
+      "required": [
+        "type",
+        "url"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Type of link. Well-known values: `privacy_policy`, `terms_of_service`, `refund_policy`, `shipping_policy`, `faq`. Consumers SHOULD handle unknown values gracefully by displaying them using the `title` field or omitting the link."
+        },
+        "url": {
+          "type": "string",
+          "description": "The actual URL pointing to the content to be displayed.",
+          "format": "uri"
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional display text for the link. When provided, use this instead of generating from type."
+        }
+      }
+    },
+    "Policy": {
+      "title": "Policy",
+      "description": "A durable business rule about the items in a response \u2014 return/refund terms, warranty, and the like \u2014 at the time of purchase. Every policy carries a `type` (an open reverse-DNS vocabulary) and a `description` so a platform can present it without understanding its type-specific fields; type-specific fields (gated by `type`) add structured context for platforms that model that type. Policies are reference data; the obligation to display a term to the buyer is carried by a `messages[]` warning whose `code` equals the policy `type` \u2014 see the Policies section of the specification.",
+      "type": "object",
+      "required": [
+        "type",
+        "description"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ReverseDomainName",
+          "description": "Policy type discriminator. Open reverse-DNS vocabulary. Well-known values: `dev.ucp.shopping.policy.return` (return terms), `dev.ucp.shopping.policy.warranty` (warranty terms). Businesses MAY define custom types in their own domain (e.g., `com.example.policy.price_match`). Platforms MUST tolerate unknown values."
+        },
+        "description": {
+          "$ref": "#/$defs/Description",
+          "description": "Human-readable policy summary in one or more formats (plain, markdown, html). Required on every policy so a platform can present it without understanding any type-specific fields. This is not the buyer-facing disclosure \u2014 display is compelled by a `messages[]` warning (see the Policies section)."
+        },
+        "applies_to": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "RFC 9535 JSONPath expressions identifying the nodes this policy applies to, relative to the embedding response root (e.g., `$.line_items[0]` in cart/checkout, `$.products[2]` in catalog). Each target covers the node it names and everything nested under it, so a target on a product also covers its variants. A singular query (RFC 9535 Section 2.3.5.1; name and index selectors only) names a single node; filters, wildcards, and slices match a set. When omitted, the policy applies to the entire response. When policies of the same `type` contest a node, the narrowest target wins and overrides the rest. See the Policies section for how specificity resolves."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Optional link to the full policy document."
+        }
+      }
+    },
+    "Description": {
+      "title": "Description",
+      "description": "Description content in one or more formats. At least one format must be provided.",
+      "type": "object",
+      "properties": {
+        "plain": {
+          "type": "string",
+          "description": "Plain text content."
+        },
+        "html": {
+          "type": "string",
+          "description": "HTML-formatted content. Security: Platforms MUST sanitize before rendering\u2014strip scripts, event handlers, and untrusted elements. Treat all rich text as untrusted input."
+        },
+        "markdown": {
+          "type": "string",
+          "description": "Markdown-formatted content."
+        }
+      },
+      "minProperties": 1
+    },
+    "CatalogLookup": {
+      "name": "dev.ucp.shopping.catalog.lookup",
+      "title": "Catalog Lookup",
+      "description": "Product/variant lookup by identifier. Supports batch retrieval (lookup_catalog) and single-product detail (get_product).",
+      "type": "object"
+    },
+    "CatalogSearch": {
+      "name": "dev.ucp.shopping.catalog.search",
+      "title": "Catalog Search",
+      "description": "Product catalog search capability.",
+      "type": "object"
+    },
+    "Checkout": {
+      "name": "dev.ucp.shopping.checkout",
+      "title": "Checkout",
+      "description": "Base checkout schema. Extensions compose onto this using allOf.",
+      "type": "object",
+      "required": [
+        "ucp",
+        "id",
+        "line_items",
+        "status",
+        "currency",
+        "totals",
+        "links"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "ucp": {
+          "$ref": "#/$defs/UcpCheckoutResponseSchema",
+          "ucp_request": "omit"
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the checkout session.",
+          "ucp_request": "omit"
+        },
+        "line_items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LineItem"
+          },
+          "description": "List of line items being checked out.",
+          "ucp_request": {
+            "create": "required",
+            "update": "required",
+            "complete": "omit"
+          }
+        },
+        "buyer": {
+          "$ref": "#/$defs/Buyer",
+          "description": "Representation of the buyer.",
+          "ucp_request": {
+            "create": "optional",
+            "update": "optional",
+            "complete": "omit"
+          }
+        },
+        "context": {
+          "$ref": "#/$defs/Context",
+          "ucp_request": {
+            "create": "optional",
+            "update": "optional",
+            "complete": "omit"
+          }
+        },
+        "signals": {
+          "$ref": "#/$defs/Signals",
+          "ucp_request": "optional"
+        },
+        "attribution": {
+          "$ref": "#/$defs/Attribution",
+          "ucp_request": "optional"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "incomplete",
+            "requires_escalation",
+            "ready_for_complete",
+            "complete_in_progress",
+            "completed",
+            "canceled"
+          ],
+          "description": "Checkout state indicating the current phase and required processing. See Checkout Status lifecycle documentation for state transition details.",
+          "ucp_request": "omit"
+        },
+        "currency": {
+          "type": "string",
+          "description": "ISO 4217 currency code reflecting the merchant's market determination. Derived from address, context, and geo IP\u2014buyers provide signals, merchants determine currency.",
+          "ucp_request": "omit"
+        },
+        "totals": {
+          "$ref": "#/$defs/Totals",
+          "description": "Different cart totals.",
+          "ucp_request": "omit"
+        },
+        "actions": {
+          "$ref": "#/$defs/Actions",
+          "description": "Outstanding extension-defined Actions for this checkout.",
+          "ucp_request": "omit"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Message"
+          },
+          "description": "List of messages with error and info about the checkout session state.",
+          "ucp_request": "omit"
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Link"
+          },
+          "description": "Links to be displayed by the platform (Privacy Policy, TOS). Mandatory for legal compliance.",
+          "ucp_request": "omit"
+        },
+        "policies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Policy"
+          },
+          "description": "Policies (e.g., return/refund terms) that apply to the items in this checkout. `applies_to` targets are relative to the response root; when absent or empty, refer to the URLs in `links[]`.",
+          "ucp_request": "omit"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "RFC 3339 expiry timestamp. Default TTL is 6 hours from creation if not sent.",
+          "ucp_request": "omit"
+        },
+        "continue_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL for checkout handoff and session recovery. MUST be provided when status is requires_escalation. See specification for format and availability requirements.",
+          "ucp_request": "omit"
+        },
+        "payment": {
+          "$ref": "#/$defs/Payment",
+          "ucp_request": {
+            "create": "optional",
+            "update": "optional",
+            "complete": "required"
+          }
+        },
+        "order": {
+          "$ref": "#/$defs/OrderConfirmation",
+          "description": "Details about an order created for this checkout session.",
+          "ucp_request": "omit"
+        }
+      }
+    },
+    "UcpCheckoutResponseSchema": {
+      "title": "UCP Checkout Response Schema",
+      "description": "UCP metadata for checkout responses.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/UcpBase"
+        },
+        {
+          "required": [
+            "payment_handlers"
+          ],
+          "properties": {
+            "services": {
+              "additionalProperties": {
+                "items": {
+                  "$ref": "#/$defs/ServiceResponseSchema"
+                }
+              }
+            },
+            "capabilities": {
+              "additionalProperties": {
+                "items": {
+                  "$ref": "#/$defs/CapabilityResponseSchema"
+                }
+              }
+            },
+            "payment_handlers": {
+              "additionalProperties": {
+                "items": {
+                  "$ref": "#/$defs/PaymentHandlerResponseSchema"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ServiceResponseSchema": {
+      "title": "Service (Response Schema)",
+      "description": "Service binding in API responses. Includes per-resource transport configuration via typed config.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ServiceBase"
+        },
+        {
+          "anyOf": [
+            {
+              "properties": {
+                "transport": {
+                  "const": "rest"
+                }
+              }
+            },
+            {
+              "properties": {
+                "transport": {
+                  "const": "mcp"
+                }
+              }
+            },
+            {
+              "properties": {
+                "transport": {
+                  "const": "a2a"
+                }
+              }
+            },
+            {
+              "properties": {
+                "transport": {
+                  "const": "embedded"
+                },
+                "config": {
+                  "$ref": "#/$defs/EmbeddedTransportConfig"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "EmbeddedTransportConfig": {
+      "title": "Embedded Transport Config",
+      "description": "Per-session configuration for embedded transport binding. Allows businesses to vary EP availability and delegations based on cart contents, agent authorization, or policy.",
+      "type": "object",
+      "properties": {
+        "delegate": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Delegations the business allows. At service-level, declares available delegations. In UCP responses, confirms accepted delegations for this session."
+        },
+        "color_scheme": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark"
+            ]
+          },
+          "description": "Color schemes the business supports. Hosts use ec_color_scheme query parameter to request a scheme from this list."
+        }
+      }
+    },
+    "PaymentHandlerResponseSchema": {
+      "title": "Payment Handler (Response Schema)",
+      "description": "Handler reference in responses. May include full config state for runtime usage of the handler.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/PaymentHandlerBase"
+        }
+      ]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Payment configuration containing handlers.",
+      "type": "object",
+      "properties": {
+        "instruments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SelectedPaymentInstrument"
+          },
+          "description": "The payment instruments available for this payment. Each instrument is associated with a specific handler via the handler_id field. Handlers can extend the base payment_instrument schema to add handler-specific fields."
+        }
+      }
+    },
+    "SelectedPaymentInstrument": {
+      "title": "Selected Payment Instrument",
+      "description": "A payment instrument with selection state.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/PaymentInstrument"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "selected": {
+              "type": "boolean",
+              "description": "Whether this instrument is selected by the user."
+            }
+          }
+        }
+      ]
+    },
+    "PaymentInstrument": {
+      "title": "Payment Instrument",
+      "description": "The base definition for any payment instrument. It links the instrument to a specific payment handler.",
+      "type": "object",
+      "required": [
+        "id",
+        "handler_id",
+        "type"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "A unique identifier for this instrument instance. Typically assigned by the platform for instruments it collects. For a business-owned saved instrument returned on an identity-linked response, this identifier is assigned by the business; the platform MUST treat it as an opaque, business-scoped reference, and the business resolves it server-side when the buyer selects it."
+        },
+        "handler_id": {
+          "type": "string",
+          "description": "The unique identifier for the handler instance that produced this instrument. This corresponds to the 'id' field in the Payment Handler definition."
+        },
+        "type": {
+          "type": "string",
+          "description": "The broad category of the instrument (e.g., 'card', 'tokenized_card'). Specific schemas will constrain this to a constant value."
+        },
+        "billing_address": {
+          "$ref": "#/$defs/PostalAddress",
+          "description": "The billing address associated with this payment method."
+        },
+        "credential": {
+          "$ref": "#/$defs/PaymentCredential"
+        },
+        "display": {
+          "type": "object",
+          "description": "Display information for this payment instrument. Each payment instrument schema defines its specific display properties, as outlined by the payment handler."
+        }
+      },
+      "additionalProperties": true
+    },
+    "PostalAddress": {
+      "title": "Postal Address",
+      "type": "object",
+      "properties": {
+        "extended_address": {
+          "type": "string",
+          "description": "An address extension such as an apartment number, C/O or alternative name."
+        },
+        "street_address": {
+          "type": "string",
+          "description": "The street address."
+        },
+        "address_locality": {
+          "type": "string",
+          "description": "The locality in which the street address is, and which is in the region. For example, Mountain View."
+        },
+        "address_region": {
+          "type": "string",
+          "description": "The region in which the locality is, and which is in the country. Required for applicable countries (i.e. state in US, province in CA). For example, California or another appropriate first-level Administrative division."
+        },
+        "address_country": {
+          "type": "string",
+          "description": "The country. Recommended to be in 2-letter ISO 3166-1 alpha-2 format, for example \"US\". For backward compatibility, a 3-letter ISO 3166-1 alpha-3 country code such as \"SGP\" or a full country name such as \"Singapore\" can also be used."
+        },
+        "postal_code": {
+          "type": "string",
+          "description": "The postal code. For example, 94043."
+        },
+        "first_name": {
+          "type": "string",
+          "description": "Optional. First name of the contact associated with the address."
+        },
+        "last_name": {
+          "type": "string",
+          "description": "Optional. Last name of the contact associated with the address."
+        },
+        "phone_number": {
+          "type": "string",
+          "description": "Optional. Phone number of the contact associated with the address."
+        }
+      }
+    },
+    "PaymentCredential": {
+      "title": "Payment Credential",
+      "description": "The base definition for any payment credential. Handlers define specific credential types.",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "The credential type discriminator. Specific schemas will constrain this to a constant value."
+        }
+      },
+      "additionalProperties": true
+    },
+    "OrderConfirmation": {
+      "title": "Order Confirmation",
+      "description": "Order details available at the time of checkout completion.",
+      "type": "object",
+      "required": [
+        "id",
+        "permalink_url"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique order identifier."
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable label for identifying the order. MUST only be provided by the business."
+        },
+        "permalink_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Permalink to access the order on merchant site."
+        }
+      }
+    },
+    "DiscountExtension": {
+      "name": "dev.ucp.shopping.discount",
+      "title": "Discount Extension",
+      "description": "Extends Cart and Checkout with discount support, including discount codes, automatic discounts, and eligibility-triggered provisional discounts."
+    },
+    "FulfillmentExtension": {
+      "name": "dev.ucp.shopping.fulfillment",
+      "title": "Fulfillment Extension",
+      "description": "Extends Catalog with fulfillment discovery and Checkout with hierarchical fulfillment.",
+      "embedded": {
+        "delegations": [
+          "fulfillment.address_change"
+        ],
+        "methods": {
+          "ec.fulfillment.change": {
+            "name": "ec.fulfillment.change",
+            "summary": "Fulfillment details changed",
+            "description": "Merchant notifies host that checkout.fulfillment has changed (shipping method selected, delivery options updated).",
+            "params": [
+              {
+                "name": "checkout",
+                "required": true,
+                "schema": {
+                  "$ref": "#/$defs/Checkout",
+                  "description": "Current checkout state with updated fulfillment."
+                }
+              }
+            ]
+          },
+          "ec.fulfillment.address_change_request": {
+            "name": "ec.fulfillment.address_change_request",
+            "summary": "Request address change",
+            "description": "Merchant requests host to present address selection UI for a shipping fulfillment method.",
+            "params": [
+              {
+                "name": "checkout",
+                "required": true,
+                "schema": {
+                  "$ref": "#/$defs/Checkout",
+                  "description": "Current checkout state with fulfillment details."
+                }
+              }
+            ],
+            "result": {
+              "name": "addressChangeResult",
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "description": "Checkout state after address selection.",
+                    "required": [
+                      "ucp",
+                      "checkout"
+                    ],
+                    "properties": {
+                      "ucp": {
+                        "$ref": "#/$defs/UcpSuccess"
+                      },
+                      "checkout": {
+                        "type": "object",
+                        "description": "Partial checkout update with fulfillment address selection.",
+                        "properties": {
+                          "fulfillment": {
+                            "$ref": "#/$defs/Fulfillment",
+                            "description": "Updated fulfillment with new selected destination and destinations."
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "$ref": "#/$defs/ErrorResponse"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "UcpSuccess": {
+      "description": "UCP metadata with status 'success'. Use for response branches that carry the expected payload.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/UcpBase"
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "success"
+            }
+          },
+          "required": [
+            "status"
+          ]
+        }
+      ]
+    },
+    "Fulfillment": {
+      "title": "Fulfillment",
+      "description": "Container for fulfillment methods and availability.",
+      "type": "object",
+      "properties": {
+        "methods": {
+          "type": "array",
+          "description": "Fulfillment methods for cart items.",
+          "items": {
+            "$ref": "#/$defs/FulfillmentMethod"
+          }
+        },
+        "available_methods": {
+          "type": "array",
+          "description": "Inventory availability hints.",
+          "items": {
+            "$ref": "#/$defs/FulfillmentAvailableMethod"
+          },
+          "ucp_request": "omit"
+        }
+      }
+    },
+    "FulfillmentMethod": {
+      "title": "Fulfillment Method",
+      "description": "A fulfillment method with destinations and groups.",
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "line_item_ids"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique fulfillment method identifier.",
+          "ucp_request": {
+            "create": "omit",
+            "update": "optional"
+          }
+        },
+        "type": {
+          "type": "string",
+          "description": "Fulfillment method type. Well-known values: `shipping`, `pickup`. Businesses MAY use additional values.",
+          "ucp_request": {
+            "create": "required",
+            "update": "optional"
+          }
+        },
+        "line_item_ids": {
+          "type": "array",
+          "description": "Line item IDs fulfilled via this method.",
+          "items": {
+            "type": "string"
+          },
+          "ucp_request": {
+            "create": "omit",
+            "update": "required"
+          }
+        },
+        "destinations": {
+          "type": "array",
+          "description": "Available destinations for this method. In Business responses, each destination carries a `type` and `id`.",
+          "ucp_request": "omit",
+          "items": {
+            "$ref": "#/$defs/FulfillmentDestination"
+          }
+        },
+        "selected_destination_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "ID of the selected destination. Accepts any stable, Business-scoped ID the Business recognizes for this method, including Location IDs not yet enumerated in `destinations`."
+        },
+        "groups": {
+          "type": "array",
+          "description": "Fulfillment groups for selecting options. Agent sets selected_option_id on groups to choose shipping method.",
+          "items": {
+            "$ref": "#/$defs/FulfillmentGroup"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "shipping"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "destinations": {
+                "type": "array",
+                "description": "Platform-authored shipping addresses for this method.",
+                "ucp_request": "optional",
+                "items": {
+                  "$ref": "#/$defs/ShippingDestination"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "pickup"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "destinations": {
+                "type": "array",
+                "description": "Business-authored business locations able to fulfill this method. Response-only: the Platform selects one via `selected_destination_id`, never writes one.",
+                "ucp_request": "omit",
+                "items": {
+                  "$ref": "#/$defs/BusinessLocationDestination"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "dependentRequired": {
+        "destinations": [
+          "type"
+        ]
+      }
+    },
+    "FulfillmentDestination": {
+      "title": "Fulfillment Destination",
+      "description": "A destination for fulfillment.",
+      "type": "object",
+      "required": [
+        "type",
+        "id"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Destination contract discriminator. Required in Business responses and optional in Platform requests. Well-known values: `shipping_address`, `business_location`. The enclosing method contract defines request defaults and which fields the Platform may write; negotiated extensions define additional values.",
+          "ucp_request": "optional"
+        },
+        "id": {
+          "type": "string",
+          "description": "Fulfillment destination identifier.",
+          "ucp_request": "optional"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "shipping_address"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "$ref": "#/$defs/ShippingDestination"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "business_location"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "$ref": "#/$defs/BusinessLocationDestination"
+          }
+        }
+      ]
+    },
+    "ShippingDestination": {
+      "title": "Shipping Destination",
+      "description": "Shipping destination.",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/$defs/PostalAddress"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "ID specific to this shipping destination.",
+              "ucp_request": "optional"
+            },
+            "type": {
+              "type": "string",
+              "const": "shipping_address",
+              "description": "Destination type discriminator.",
+              "ucp_request": "optional"
+            }
+          },
+          "required": [
+            "id",
+            "type"
+          ]
+        }
+      ]
+    },
+    "BusinessLocationDestination": {
+      "title": "Business Location Destination",
+      "description": "A business location fulfillment destination. Business-authored and response-only: the Platform selects a location via `selected_destination_id` rather than writing destinations.",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/$defs/LocationSummary"
+        },
+        {
+          "type": "object",
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "business_location",
+              "description": "Destination type discriminator. Response-only.",
+              "ucp_request": "omit"
+            }
+          }
+        }
+      ]
+    },
+    "LocationSummary": {
+      "title": "Location Summary",
+      "description": "A summary of a physical business location.",
+      "type": "object",
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable, opaque, Business-scoped Location identifier.",
+          "ucp_request": "required"
+        },
+        "name": {
+          "type": "string",
+          "description": "Buyer-facing, Business-owned display name.",
+          "ucp_request": "omit"
+        },
+        "address": {
+          "$ref": "#/$defs/PostalAddress",
+          "description": "Physical address of the location.",
+          "ucp_request": "omit"
+        }
+      }
+    },
+    "FulfillmentGroup": {
+      "title": "Fulfillment Group",
+      "description": "A merchant-generated package/group of line items with fulfillment options.",
+      "type": "object",
+      "required": [
+        "id",
+        "line_item_ids"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Group identifier for referencing merchant-generated groups in updates.",
+          "ucp_request": {
+            "create": "omit",
+            "update": "required"
+          }
+        },
+        "line_item_ids": {
+          "type": "array",
+          "description": "Line item IDs included in this group/package.",
+          "items": {
+            "type": "string"
+          },
+          "ucp_request": "omit"
+        },
+        "options": {
+          "type": "array",
+          "description": "Available fulfillment options for this group.",
+          "items": {
+            "$ref": "#/$defs/FulfillmentOption"
+          },
+          "ucp_request": "omit"
+        },
+        "selected_option_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "ID of the selected fulfillment option for this group."
+        }
+      }
+    },
+    "FulfillmentOption": {
+      "title": "Fulfillment Option",
+      "description": "A fulfillment option within a group (e.g., Standard Shipping $5, Express $15). Extends the fulfillment option base with cost and timing.",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/$defs/FulfillmentOptionBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "totals"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "carrier": {
+              "type": "string",
+              "description": "Carrier name (for shipping).",
+              "ucp_request": "omit"
+            },
+            "earliest_fulfillment_time": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Earliest fulfillment date.",
+              "ucp_request": "omit"
+            },
+            "latest_fulfillment_time": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Latest fulfillment date.",
+              "ucp_request": "omit"
+            },
+            "totals": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Total"
+              },
+              "description": "Fulfillment option totals breakdown.",
+              "ucp_request": "omit"
+            }
+          }
+        }
+      ]
+    },
+    "FulfillmentOptionBase": {
+      "title": "Fulfillment Option Base",
+      "description": "Common base for a fulfillment option: an addressable, renderable choice (e.g. Standard, Express). Catalog uses this base directly; checkout composes it with cost and timing.",
+      "type": "object",
+      "required": [
+        "id",
+        "title"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for this fulfillment option.",
+          "ucp_request": "omit"
+        },
+        "title": {
+          "type": "string",
+          "description": "Short label that distinguishes this option from its siblings (e.g. 'Standard', 'Express Shipping', 'Curbside Pickup').",
+          "ucp_request": "omit"
+        },
+        "description": {
+          "$ref": "#/$defs/Description",
+          "description": "Supplementary context for the title (e.g. 'Arrives in 4 business days', 'Arrives Dec 12-15 via FedEx'). Directly renderable; MUST NOT repeat the title.",
+          "ucp_request": "omit"
+        }
+      }
+    },
+    "FulfillmentAvailableMethod": {
+      "title": "Fulfillment Available Method",
+      "description": "Inventory availability hint for a fulfillment method type.",
+      "type": "object",
+      "required": [
+        "type",
+        "line_item_ids"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Fulfillment method type this availability applies to. Well-known values: `shipping`, `pickup`; businesses MAY use additional values.",
+          "ucp_request": "omit"
+        },
+        "line_item_ids": {
+          "type": "array",
+          "description": "Line items available for this fulfillment method.",
+          "items": {
+            "type": "string"
+          },
+          "ucp_request": "omit"
+        },
+        "fulfillable_on": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "'now' for immediate availability, or ISO 8601 date for future (preorders, transfers).",
+          "ucp_request": "omit"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable availability info (e.g., 'Available for pickup at Downtown Store today').",
+          "ucp_request": "omit"
+        }
+      }
+    },
+    "ErrorResponse": {
+      "title": "Error Response",
+      "description": "Generic error response when business logic prevents resource creation or failed to retrieve resource. Used when no valid resource can be established.",
+      "type": "object",
+      "required": [
+        "ucp",
+        "messages"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "ucp": {
+          "$ref": "#/$defs/UcpError",
+          "description": "UCP protocol metadata. Status MUST be 'error' for error response."
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Message"
+          },
+          "minItems": 1,
+          "description": "Array of messages describing why the operation failed."
+        },
+        "continue_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL for buyer handoff or session recovery."
+        }
+      }
+    },
+    "UcpError": {
+      "description": "UCP metadata with status 'error'. Use for response branches that carry error information.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/UcpBase"
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "error"
+            }
+          },
+          "required": [
+            "status"
+          ]
+        }
+      ]
+    },
+    "Order": {
+      "name": "dev.ucp.shopping.order",
+      "title": "Order",
+      "description": "Order schema with line items, buyer-facing fulfillment expectations, and event logs.",
+      "type": "object",
+      "required": [
+        "ucp",
+        "id",
+        "checkout_id",
+        "permalink_url",
+        "line_items",
+        "fulfillment",
+        "currency",
+        "totals"
+      ],
+      "properties": {
+        "ucp": {
+          "$ref": "#/$defs/UcpOrderResponseSchema"
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique order identifier."
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable label for identifying the order. MUST only be provided by the business."
+        },
+        "checkout_id": {
+          "type": "string",
+          "description": "Associated checkout ID for reconciliation."
+        },
+        "permalink_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Permalink to access the order on merchant site."
+        },
+        "line_items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/OrderLineItem"
+          },
+          "description": "Line items representing what was purchased \u2014 can change post-order via edits or exchanges."
+        },
+        "fulfillment": {
+          "type": "object",
+          "properties": {
+            "expectations": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Expectation"
+              },
+              "description": "Buyer-facing groups representing when/how items will be delivered. Can be split, merged, or adjusted post-order."
+            },
+            "events": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/FulfillmentEvent"
+              },
+              "description": "Append-only event log of actual shipments. Each event references line items by ID."
+            }
+          },
+          "description": "Fulfillment data: buyer expectations and what actually happened."
+        },
+        "adjustments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Adjustment"
+          },
+          "description": "Post-order events (refunds, returns, credits, disputes, cancellations, etc.) that exist independently of fulfillment."
+        },
+        "currency": {
+          "type": "string",
+          "description": "ISO 4217 currency code. MUST match the currency from the originating checkout session.",
+          "ucp_request": "omit"
+        },
+        "totals": {
+          "$ref": "#/$defs/Totals",
+          "description": "Different totals for the order."
+        },
+        "policies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Policy"
+          },
+          "description": "Snapshot of the policies that applied to the items at checkout, captured on the order as a durable record. `applies_to` targets are relative to the response root.",
+          "ucp_request": "omit"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Message"
+          },
+          "description": "Business outcome messages (errors, warnings, informational). Present when the business needs to communicate status or issues to the platform."
+        },
+        "attribution": {
+          "$ref": "#/$defs/Attribution",
+          "description": "Snapshot of the attribution associated with the originating checkout. Read-only on the order.",
+          "ucp_request": "omit"
+        }
+      }
+    },
+    "UcpOrderResponseSchema": {
+      "title": "UCP Order Response Schema",
+      "description": "UCP metadata for order responses. No payment handlers needed post-purchase.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/UcpBase"
+        },
+        {
+          "properties": {
+            "capabilities": {
+              "additionalProperties": {
+                "items": {
+                  "$ref": "#/$defs/CapabilityResponseSchema"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "OrderLineItem": {
+      "title": "Order Line Item",
+      "type": "object",
+      "required": [
+        "id",
+        "item",
+        "quantity",
+        "totals",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Line item identifier."
+        },
+        "item": {
+          "$ref": "#/$defs/Item",
+          "description": "Purchased item data, including identity, price, and sale basis."
+        },
+        "quantity": {
+          "type": "object",
+          "required": [
+            "total",
+            "fulfilled"
+          ],
+          "properties": {
+            "original": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Quantity from the original checkout, expressed as an integer step count."
+            },
+            "total": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Current active quantity after returns, cancellations, or other order changes, expressed as an integer step count."
+            },
+            "fulfilled": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Quantity fulfilled so far, expressed as an integer step count."
+            }
+          },
+          "description": "Tracks the line item's original, current active, and fulfilled quantities. All three values use the same inherited `item.quantity_unit`. When `item.quantity_unit` is absent on an authoritative order response, each step is one whole item (`each`) under the shared default."
+        },
+        "totals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Total"
+          },
+          "description": "Line item totals breakdown."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "processing",
+            "partial",
+            "fulfilled",
+            "removed"
+          ],
+          "description": "Derived status: removed if quantity.total == 0, fulfilled if quantity.total > 0 and quantity.fulfilled == quantity.total, partial if quantity.total > 0 and quantity.fulfilled > 0, otherwise processing."
+        },
+        "parent_id": {
+          "type": "string",
+          "description": "Parent line item identifier for any nested structures."
+        }
+      }
+    },
+    "Expectation": {
+      "title": "Expectation",
+      "description": "Buyer-facing fulfillment expectation representing logical groupings of items (e.g., 'package'). Can be split, merged, or adjusted post-order to set buyer expectations for when/how items arrive.",
+      "type": "object",
+      "required": [
+        "id",
+        "line_items",
+        "method_type",
+        "destination"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Expectation identifier."
+        },
+        "line_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "quantity"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Line item ID reference."
+              },
+              "quantity": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Integer count of steps of the referenced line item's `quantity_unit` (`10^-scale` \u00d7 `unit`); when `quantity_unit` is absent, it counts whole items (`each`)."
+              }
+            }
+          },
+          "description": "Which line items and quantities are in this expectation."
+        },
+        "method_type": {
+          "type": "string",
+          "description": "Delivery method type. Well-known values: `shipping`, `pickup`, `digital`; additional values MAY be used."
+        },
+        "destination": {
+          "$ref": "#/$defs/PostalAddress",
+          "description": "Delivery destination address."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable delivery description (e.g., 'Arrives in 5-8 business days')."
+        },
+        "fulfillable_on": {
+          "type": "string",
+          "description": "When this expectation can be fulfilled: 'now' or ISO 8601 timestamp for future date (backorder, pre-order)."
+        }
+      }
+    },
+    "FulfillmentEvent": {
+      "title": "Fulfillment Event",
+      "description": "Append-only fulfillment event representing an actual shipment. References line items by ID.",
+      "type": "object",
+      "required": [
+        "id",
+        "occurred_at",
+        "type",
+        "line_items"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Fulfillment event identifier."
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "RFC 3339 timestamp when this fulfillment event occurred."
+        },
+        "type": {
+          "type": "string",
+          "description": "Fulfillment event type. Common values include: processing (preparing to ship), shipped (handed to carrier), in_transit (in delivery network), delivered (received by buyer), failed_attempt (delivery attempt failed), canceled (fulfillment canceled), undeliverable (cannot be delivered), returned_to_sender (returned to merchant)."
+        },
+        "line_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "quantity"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Line item ID reference."
+              },
+              "quantity": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Integer count of steps of the referenced line item's `quantity_unit` (`10^-scale` \u00d7 `unit`); when `quantity_unit` is absent, it counts whole items (`each`)."
+              }
+            }
+          },
+          "description": "Which line items and quantities are fulfilled in this event."
+        },
+        "tracking_number": {
+          "type": "string",
+          "description": "Carrier tracking number (required if type != processing)."
+        },
+        "tracking_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to track this shipment (required if type != processing)."
+        },
+        "carrier": {
+          "type": "string",
+          "description": "Carrier name (e.g., 'FedEx', 'USPS')."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the shipment status or delivery information (e.g., 'Delivered to front door', 'Out for delivery')."
+        }
+      }
+    },
+    "Adjustment": {
+      "title": "Adjustment",
+      "description": "Post-order event that exists independently of fulfillment. Typically represents money movements but can be any post-order change. Polymorphic type that can optionally reference line items.",
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "occurred_at",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Adjustment event identifier."
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of adjustment (open string). Typically money-related like: refund, return, credit, price_adjustment, dispute, cancellation. Can be any value that makes sense for the merchant's business."
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "RFC 3339 timestamp when this adjustment occurred."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "completed",
+            "failed"
+          ],
+          "description": "Adjustment status."
+        },
+        "line_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "quantity"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Line item ID reference."
+              },
+              "quantity": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "Signed integer count of steps of the referenced line item's `quantity_unit` (`10^-scale` \u00d7 `unit`); when `quantity_unit` is absent, it counts whole items (`each`). Negative values represent reductions (e.g. returns); positive values represent additions (e.g. exchanges)."
+              },
+              "measure": {
+                "$ref": "#/$defs/Measure",
+                "description": "The settled measurement this adjustment reconciles (for example, actual picked weight), present when the line's price settles by measurement. Its unit identity MUST match the line's pricing basis (`item.unit_price` measure/reference unit); no unit conversion. A pure price settlement uses `quantity: 0` together with `measure` and a totals delta."
+              }
+            }
+          },
+          "description": "Which line items and quantities are affected (optional)."
+        },
+        "totals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Total"
+          },
+          "description": "Adjustment totals breakdown. Signed values - negative for money returned to buyer (refunds, credits), positive for additional charges (exchanges)."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable reason or description (e.g., 'Defective item', 'Customer requested')."
+        }
+      }
+    },
+    "PermalinkCapability": {
+      "name": "dev.ucp.shopping.permalink",
+      "title": "Permalink Capability",
+      "description": "Browser-addressable shopping intent capability: defines a Business browser endpoint and redirect resolution. It defines no shopping-state fields of its own; permalink query parameters address existing UCP field paths."
+    },
+    "Availability": {
+      "title": "Availability",
+      "description": "Availability of an item: whether it can be obtained, and a qualifying status.",
+      "type": "object",
+      "properties": {
+        "available": {
+          "type": "boolean",
+          "description": "Whether this can be obtained. See status for fulfillment details."
+        },
+        "status": {
+          "type": "string",
+          "description": "Qualifies available with fulfillment state. Well-known values: `in_stock`, `backorder`, `preorder`, `out_of_stock`, `discontinued`."
+        }
+      }
+    },
+    "BusinessFulfillmentConfig": {
+      "title": "Business Fulfillment Config",
+      "description": "Business's fulfillment configuration.",
+      "type": "object",
+      "properties": {
+        "multi_destination": {
+          "type": "array",
+          "description": "Method types that permit multiple destinations within one cart (e.g. split shipping across addresses). Listing a method permits it; an omitted method does not. Open \u2014 businesses MAY list any method type.",
+          "items": {
+            "type": "object",
+            "required": [
+              "method"
+            ],
+            "additionalProperties": true,
+            "properties": {
+              "method": {
+                "type": "string",
+                "description": "Fulfillment method type (e.g. `shipping`, `pickup`). Optional per-method constraints MAY be added alongside."
+              }
+            }
+          }
+        },
+        "method_combinations": {
+          "type": "array",
+          "description": "Method-type combinations the business permits within one cart. Each inner array is a permitted set of method `type` values (e.g. shipping + pickup).",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Fulfillment method `type`. Well-known values: `shipping`, `pickup`."
+            }
+          }
+        }
+      }
+    },
+    "Category": {
+      "title": "Category",
+      "description": "A product category with optional taxonomy identifier.",
+      "type": "object",
+      "required": [
+        "value"
+      ],
+      "properties": {
+        "value": {
+          "type": "string",
+          "description": "Category value or path (e.g., 'Apparel > Shirts', '1604')."
+        },
+        "taxonomy": {
+          "type": "string",
+          "description": "Source taxonomy. Well-known values: `google_product_category`, `shopify`, `merchant`."
+        }
+      }
+    },
+    "DetailOptionValue": {
+      "title": "Detail Option Value",
+      "description": "An option value with availability signals relative to the current selections. Used in get_product responses where selected context exists.",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/$defs/OptionValue"
+        }
+      ],
+      "properties": {
+        "available": {
+          "type": "boolean",
+          "description": "Whether a variant matching this value and the current option selections is purchasable."
+        },
+        "exists": {
+          "type": "boolean",
+          "description": "Whether a variant matching this value and the current option selections exists in the catalog."
+        }
+      }
+    },
+    "OptionValue": {
+      "title": "Option Value",
+      "description": "A selectable value for a product option.",
+      "type": "object",
+      "required": [
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Optional server-assigned identifier for this option value. When present in a selected_option, the server SHOULD use it for matching instead of label."
+        },
+        "label": {
+          "type": "string",
+          "description": "Display text for this option value (e.g., 'Small', 'Blue')."
+        }
+      }
+    },
+    "FulfillmentDestinationFilter": {
+      "title": "Fulfillment Destination Filter",
+      "description": "A specific destination, named by value or by reference: a coarse locality (`address_country` / `address_region` / `postal_code`), or a `location` id. Platforms SHOULD provide one or the other, not both; if both are present, a business SHOULD use the more specific \u2014 typically `location`.",
+      "type": "object",
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/Locality"
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "A reference to the destination (e.g. store, pickup location, saved address)."
+            }
+          }
+        }
+      ]
+    },
+    "InputCorrelation": {
+      "title": "Input Correlation",
+      "description": "Maps a request identifier to the variant it resolved to, with match semantics.",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The identifier from the lookup request that resolved to this variant."
+        },
+        "match": {
+          "type": "string",
+          "description": "How the request identifier resolved to this variant. Well-known values: `exact` (input directly identifies this variant, e.g., variant ID, SKU), `featured` (server selected this variant as representative, e.g., product ID resolved to best match). Businesses MAY implement and provide additional resolution strategies.",
+          "examples": [
+            "exact",
+            "featured"
+          ]
+        }
+      }
+    },
+    "PlatformFulfillmentConfig": {
+      "title": "Platform Fulfillment Config",
+      "description": "Platform's fulfillment configuration.",
+      "type": "object",
+      "properties": {
+        "supports_multi_group": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enables multiple groups per method."
+        }
+      }
+    },
+    "Product": {
+      "title": "Product",
+      "description": "A product in the catalog with variants and options.",
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "description",
+        "price_range",
+        "variants"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Global ID (GID) uniquely identifying this product."
+        },
+        "handle": {
+          "type": "string",
+          "description": "URL-safe slug for SEO-friendly URLs (e.g., 'blue-runner-pro'). Use id for stable API references."
+        },
+        "title": {
+          "type": "string",
+          "description": "Product title."
+        },
+        "description": {
+          "$ref": "#/$defs/Description",
+          "description": "Product description in one or more formats."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Canonical product page URL."
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Category"
+          },
+          "description": "Product categories with optional taxonomy identifiers."
+        },
+        "price_range": {
+          "$ref": "#/$defs/PriceRange",
+          "description": "Price range across all variants."
+        },
+        "list_price_range": {
+          "$ref": "#/$defs/PriceRange",
+          "description": "List price range before discounts (for strikethrough display)."
+        },
+        "media": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Media"
+          },
+          "description": "Product media (images, videos, 3D models). First item is the featured media for listings."
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ProductOption"
+          },
+          "description": "Product options (Size, Color, etc.)."
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Variant"
+          },
+          "minItems": 1,
+          "description": "Purchasable variants of this product. First item is the featured variant for listings."
+        },
+        "rating": {
+          "$ref": "#/$defs/Rating",
+          "description": "Aggregate product rating."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Product tags for categorization and search."
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Business-defined custom data extending the standard product model."
+        }
+      }
+    },
+    "PriceRange": {
+      "title": "Price Range",
+      "description": "A price range representing minimum and maximum values (e.g., a common example in retail shopping is when prices vary across product variants).",
+      "type": "object",
+      "required": [
+        "min",
+        "max"
+      ],
+      "properties": {
+        "min": {
+          "$ref": "#/$defs/Price",
+          "description": "Minimum price in the range."
+        },
+        "max": {
+          "$ref": "#/$defs/Price",
+          "description": "Maximum price in the range."
+        }
+      }
+    },
+    "Price": {
+      "title": "Price",
+      "description": "Price with explicit currency.",
+      "type": "object",
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "properties": {
+        "amount": {
+          "$ref": "#/$defs/Amount",
+          "description": "Amount in ISO 4217 minor units. Use 0 for free items."
+        },
+        "currency": {
+          "type": "string",
+          "description": "ISO 4217 currency code (e.g., 'USD', 'EUR', 'GBP').",
+          "pattern": "^[A-Z]{3}$"
+        }
+      }
+    },
+    "Media": {
+      "title": "Media",
+      "description": "Media item (image, video, etc.).",
+      "type": "object",
+      "required": [
+        "type",
+        "url"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Media type. Well-known values: `image`, `video`, `model_3d`."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to the media resource."
+        },
+        "alt_text": {
+          "type": "string",
+          "description": "Accessibility text describing the media."
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Width in pixels (for images/video)."
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Height in pixels (for images/video)."
+        }
+      }
+    },
+    "ProductOption": {
+      "title": "Product Option",
+      "description": "A product option such as size, color, or material.",
+      "type": "object",
+      "required": [
+        "name",
+        "values"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Option name (e.g., 'Size', 'Color')."
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/OptionValue"
+          },
+          "minItems": 1,
+          "description": "Available values for this option."
+        }
+      }
+    },
+    "Variant": {
+      "title": "Variant",
+      "description": "A purchasable variant of a product with specific option selections.",
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "description",
+        "price"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Global ID (GID) uniquely identifying this variant. Used as item.id in checkout."
+        },
+        "sku": {
+          "type": "string",
+          "description": "Business-assigned identifier for inventory and fulfillment."
+        },
+        "barcodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "type",
+              "value"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Barcode standard. Well-known values: UPC, EAN, ISBN, GTIN, JAN."
+              },
+              "value": {
+                "type": "string",
+                "description": "Barcode value."
+              }
+            }
+          },
+          "description": "Industry-standard product identifiers for cross-reference and correlation."
+        },
+        "handle": {
+          "type": "string",
+          "description": "URL-safe variant handle/slug."
+        },
+        "title": {
+          "type": "string",
+          "description": "Variant display title (e.g., 'Blue / Large')."
+        },
+        "description": {
+          "$ref": "#/$defs/Description",
+          "description": "Variant description in one or more formats."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Canonical variant page URL."
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Category"
+          },
+          "description": "Variant categories with optional taxonomy identifiers."
+        },
+        "price": {
+          "$ref": "#/$defs/Price",
+          "description": "Current selling price. Price is the amount per one whole `quantity_unit.unit` (for example, per lb or per hour); when `quantity_unit` is absent, it is per `each`. Line total is `price \u00d7 quantity \u00d7 10^-scale`, computed and rounded once by the Business; `totals` remain authoritative."
+        },
+        "quantity_unit": {
+          "$ref": "#/$defs/QuantityUnit",
+          "description": "Sale basis this variant's `quantity` is denominated in. The default sale basis is `each`, whose machine identity is (`C62`, 0); `C62` is the UN/CEFACT Rec20 code for one/each. An absent catalog descriptor encodes that default. An `increment` advertises the ordering granularity in steps (for example, `scale` 2 with `increment` 25 sells in 0.25-unit multiples)."
+        },
+        "list_price": {
+          "$ref": "#/$defs/Price",
+          "description": "List price before discounts (for strikethrough display)."
+        },
+        "unit_price": {
+          "$ref": "#/$defs/UnitPrice",
+          "description": "Price per standard unit of measurement, for shelf-style comparison display. MAY be omitted when unit pricing does not apply."
+        },
+        "availability": {
+          "$ref": "#/$defs/Availability",
+          "description": "Variant availability for purchase."
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SelectedOption"
+          },
+          "description": "Option values that define this variant (e.g., Color: Blue, Size: Large)."
+        },
+        "media": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Media"
+          },
+          "description": "Variant media (images, videos, 3D models). First item is the featured media for listings."
+        },
+        "rating": {
+          "$ref": "#/$defs/Rating",
+          "description": "Variant rating."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Variant tags for categorization and search."
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Business-defined custom data extending the standard variant model."
+        },
+        "seller": {
+          "type": "object",
+          "description": "Optional seller context for this variant.",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Seller display name."
+            },
+            "links": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Link"
+              },
+              "description": "Seller policy and information links."
+            }
+          }
+        }
+      }
+    },
+    "SelectedOption": {
+      "title": "Selected Option",
+      "description": "A specific option selection on a variant (e.g., Size: Large).",
+      "type": "object",
+      "required": [
+        "name",
+        "label"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Option name (e.g., 'Size')."
+        },
+        "id": {
+          "type": "string",
+          "description": "Optional option value identifier from option_value.id. When present, the server SHOULD use it for matching; name and label remain required for display."
+        },
+        "label": {
+          "type": "string",
+          "description": "Selected option label (e.g., 'Large')."
+        }
+      }
+    },
+    "Rating": {
+      "title": "Rating",
+      "description": "Product rating aggregate.",
+      "type": "object",
+      "required": [
+        "value",
+        "scale_max"
+      ],
+      "properties": {
+        "value": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Average rating value."
+        },
+        "scale_min": {
+          "type": "number",
+          "minimum": 0,
+          "default": 1,
+          "description": "Minimum value on the rating scale (e.g., 1 for 1-5 stars)."
+        },
+        "scale_max": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Maximum value on the rating scale (e.g., 5 for 5-star)."
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of reviews contributing to the rating."
+        }
+      }
+    },
+    "SearchFilters": {
+      "title": "Search Filters",
+      "description": "Filter criteria to narrow search results. All specified filters combine with AND logic.",
+      "type": "object",
+      "properties": {
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Filter by product categories (OR logic \u2014 matches products in any listed categories). Values match against the value field in product category entries. Valid values can be discovered from the categories field in search results, merchant documentation, or standard taxonomies that businesses may align with."
+        },
+        "price": {
+          "$ref": "#/$defs/PriceFilter"
+        }
+      },
+      "additionalProperties": true
+    },
+    "PriceFilter": {
+      "title": "Price Filter",
+      "description": "Price range filter denominated in context.currency. When context.currency matches the presentment currency, businesses apply the filter directly. When it differs, businesses SHOULD convert filter values to the presentment currency before applying; if conversion is not supported, businesses MAY ignore the filter and SHOULD indicate this via a message. When context.currency is absent, filter denomination is ambiguous and businesses MAY ignore it.",
+      "type": "object",
+      "properties": {
+        "min": {
+          "$ref": "#/$defs/Amount",
+          "description": "Minimum price in ISO 4217 minor units."
+        },
+        "max": {
+          "$ref": "#/$defs/Amount",
+          "description": "Maximum price in ISO 4217 minor units."
+        }
+      }
+    },
+    "IdentityLinking": {
+      "name": "dev.ucp.common.identity_linking",
+      "title": "Identity Linking",
+      "description": "Capability schema for identity linking. Businesses declare the user-authenticated scopes they offer in a flat 'scopes' map. Each key is the OAuth scope string as it appears on the wire ('{capability}:{scope}', e.g. 'dev.ucp.shopping.order:read'). Scope presence implies that the corresponding operations require user authentication. Operations not gated by any listed scope operate at whatever access level the business permits; UCP does not prescribe a default."
+    },
+    "LocationLookup": {
+      "name": "dev.ucp.common.location.lookup",
+      "title": "Location Lookup",
+      "description": "Location lookup by identifiers. Supports batch retrieval and single-location detail.",
+      "type": "object"
+    },
+    "LocationSearch": {
+      "name": "dev.ucp.common.location.search",
+      "title": "Location Search",
+      "description": "Location search capability. Supports natural language queries, distance and serviceability relations, structured filtering including current item availability, and pagination.",
+      "type": "object"
+    },
+    "LoyaltyExtension": {
+      "name": "dev.ucp.common.loyalty",
+      "title": "Loyalty Extension",
+      "description": "Extends various Capabilities with loyalty support using memberships info."
+    },
+    "PaymentAp2MandateExtension": {
+      "name": "dev.ucp.common.payment.ap2_mandate",
+      "title": "Payment AP2 Mandate Extension",
+      "description": "Extends Checkout with cryptographic mandate support for non-repudiable authorization per the AP2 protocol. Uses embedded signature model with ap2 namespace."
+    },
+    "PaymentAuthenticationExtension": {
+      "name": "dev.ucp.common.payment.authentication",
+      "title": "Payment Authentication Extension",
+      "description": "Extends capabilities (e.g., checkout in retail shopping) with standard device data collection and 3DS challenge Action types used during payment authentication."
+    },
+    "PaymentSplitPaymentsExtension": {
+      "name": "dev.ucp.common.payment.split_payments",
+      "title": "Payment Split Payments Extension",
+      "description": "Enables Buyers to use multiple payment instruments for a single session."
+    },
+    "PaymentTermsExtension": {
+      "name": "dev.ucp.common.payment.terms",
+      "title": "Payment Terms Extension",
+      "description": "Extends capabilities (e.g., checkout in retail shopping) with selectable payment terms, letting a Business offer alternative schedules for when payment for the checkout is due, and projects the accepted term onto the resulting Order."
+    },
+    "AmenityType": {
+      "title": "Amenity Type",
+      "description": "A standardized open reverse-DNS string representing a physical feature, capability, or service provided by a location. Supports a 2-tier hierarchy when defining well-known values in UCP: 1) Common vocabulary for universal features that directly live on `dev.ucp.amenity` (e.g., dev.ucp.amenity.wi_fi) and 2) Industry-scoped features that MUST append their related service name on top of `dev.ucp.amenity` (e.g., dev.ucp.amenity.shopping.in_store_pickup). Businesses MAY define custom vocabulary in their own domain (e.g., com.example.amenity.auto_care_center).",
+      "$ref": "#/$defs/ReverseDomainName",
+      "examples": [
+        "dev.ucp.amenity.wi_fi",
+        "dev.ucp.amenity.parking",
+        "dev.ucp.amenity.shopping.in_store_pickup",
+        "dev.ucp.amenity.shopping.curbside_pickup"
+      ]
+    },
+    "Binding": {
+      "title": "Binding",
+      "description": "Binds a credential or token to a specific capability resource. Prevents reuse across different resources.",
+      "type": "object",
+      "required": [
+        "type",
+        "id"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ReverseDomainName",
+          "description": "The capability that owns the bound resource, for example dev.ucp.shopping.checkout. MUST be a capability name declared in the UCP namespace."
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Opaque identifier of the bound resource within the owning capability, for example a checkout identifier."
+        }
+      }
+    },
+    "BusinessSplitPaymentsConfig": {
+      "title": "Business Split Payments Config",
+      "description": "Business-level configuration for split payments. Declaring the capability means multiple payment instruments are supported; this config declares which combinations are valid.",
+      "type": "object",
+      "required": [
+        "allowed_combinations"
+      ],
+      "properties": {
+        "allowed_combinations": {
+          "type": "array",
+          "description": "Array of valid instrument combinations. Each combination is an array of instrument groups. A payment is valid if it matches any combination.",
+          "items": {
+            "type": "array",
+            "description": "A single valid combination: an array of instrument groups that together define the constraints. All groups must be satisfied (AND logic).",
+            "items": {
+              "$ref": "#/$defs/InstrumentGroup"
+            },
+            "minItems": 1
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "InstrumentGroup": {
+      "title": "Instrument Group",
+      "description": "A constraint within an allowed combination that defines which instrument types can fill this group and how many are permitted.",
+      "type": "object",
+      "required": [
+        "types"
+      ],
+      "properties": {
+        "types": {
+          "type": "array",
+          "description": "Instrument types accepted by this group (OR logic). Any listed type qualifies.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "min": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Minimum number of instruments required from this group. Defaults to 0 (optional)."
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Maximum number of instruments allowed from this group. Defaults to 1. MUST be greater than or equal to `min`."
+        }
+      }
+    },
+    "CardCredential": {
+      "title": "Card Credential",
+      "description": "Deprecated: use PAN Credential (`pan_credential.json`) or Network Token Credential (`network_token_credential.json`). A card credential containing sensitive payment card details including raw Primary Account Numbers (PANs). This credential type MUST NOT be used for checkout, only with payment handlers that tokenize or encrypt credentials. CRITICAL: Both parties handling CardCredential (sender and receiver) MUST be PCI DSS compliant. Transmission MUST use HTTPS/TLS with strong cipher suites.",
+      "deprecated": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/PaymentCredential"
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "card_number_type"
+          ],
+          "properties": {
+            "type": {
+              "const": "card",
+              "description": "The credential type identifier for card credentials."
+            },
+            "card_number_type": {
+              "type": "string",
+              "enum": [
+                "fpan",
+                "network_token",
+                "dpan"
+              ],
+              "description": "Deprecated: the credential type now carries this distinction. The type of card number. Network tokens are preferred with fallback to FPAN. See PCI Scope for more details."
+            },
+            "number": {
+              "type": "string",
+              "description": "Card number.",
+              "examples": [
+                "4242424242424242"
+              ]
+            },
+            "expiry_month": {
+              "type": "integer",
+              "description": "The month of the card's expiration date (1-12)."
+            },
+            "expiry_year": {
+              "type": "integer",
+              "description": "The year of the card's expiration date."
+            },
+            "name": {
+              "type": "string",
+              "description": "Cardholder name.",
+              "examples": [
+                "Jane Doe"
+              ]
+            },
+            "cvc": {
+              "type": "string",
+              "maxLength": 4,
+              "description": "Card CVC number.",
+              "examples": [
+                "223"
+              ]
+            },
+            "cryptogram": {
+              "type": "string",
+              "description": "Cryptogram provided with network tokens.",
+              "examples": [
+                "gXc5UCLnM6ckD7pjM1TdPA=="
+              ]
+            },
+            "eci_value": {
+              "type": "string",
+              "description": "Electronic Commerce Indicator / Security Level Indicator provided with network tokens.",
+              "examples": [
+                "07"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "CardPaymentInstrument": {
+      "title": "Card Payment Instrument",
+      "description": "A basic card payment instrument with visible card details. Can be inherited by a handler's instrument schema to define handler-specific display details or more complex credential structures.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/PaymentInstrument"
+        },
+        {
+          "type": "object",
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "card",
+              "description": "Indicates this is a card payment instrument."
+            },
+            "network": {
+              "type": "string",
+              "description": "Card network elected for this transaction, typically a co-badged selection. When present, the business MAY decline if the card cannot route over it and MUST NOT substitute another."
+            },
+            "display": {
+              "type": "object",
+              "description": "Display information for this card payment instrument.",
+              "properties": {
+                "brand": {
+                  "type": "string",
+                  "description": "The card brand/network shown to the buyer (e.g., visa, mastercard, amex). Presentational only."
+                },
+                "last_digits": {
+                  "type": "string",
+                  "description": "Last 4 digits of the card number."
+                },
+                "expiry_month": {
+                  "type": "integer",
+                  "description": "The month of the card's expiration date (1-12)."
+                },
+                "expiry_year": {
+                  "type": "integer",
+                  "description": "The year of the card's expiration date."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "An optional rich text description of the card to display to the user (e.g., 'Visa ending in 1234, expires 12/2025')."
+                },
+                "card_art": {
+                  "type": "string",
+                  "format": "uri",
+                  "description": "An optional URI to a rich image representing the card (e.g., card art provided by the issuer)."
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "DailyHour": {
+      "title": "Daily Hour",
+      "description": "A regular weekly operating interval. Its `day`, `opens`, and `closes` are recurring local civil values interpreted in the containing Location's `timezone`. Multiple entries for the same day support split shifts.",
+      "type": "object",
+      "required": [
+        "day",
+        "opens",
+        "closes"
+      ],
+      "allOf": [
+        {
+          "$ref": "#/$defs/TimeInterval"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "day": {
+              "type": "string",
+              "enum": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ],
+              "description": "A stable UCP day-of-week identifier for the day on which this recurring local civil-time interval begins in the containing Location's `timezone`. It is not localized display text.",
+              "ucp_request": "omit"
+            }
+          }
+        }
+      ]
+    },
+    "TimeInterval": {
+      "title": "Time Interval",
+      "description": "Reusable opening and closing time fields for a containing schedule schema. Containing schemas determine whether the `opens` and `closes` pair is required; this fragment's standalone `{}` is not an interval.",
+      "type": "object",
+      "properties": {
+        "opens": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+          "description": "Opening time in 24-hour HH:MM format.",
+          "ucp_request": "omit"
+        },
+        "closes": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+          "description": "Closing time in 24-hour HH:MM format.",
+          "ucp_request": "omit"
+        }
+      },
+      "dependentRequired": {
+        "opens": [
+          "closes"
+        ],
+        "closes": [
+          "opens"
+        ]
+      }
+    },
+    "ExceptionHour": {
+      "title": "Exception Hour",
+      "description": "A date-specific operating interval or full closure. Its `valid_from`, `valid_through`, `opens`, and `closes` are local civil values interpreted in the containing Location's `timezone`. Date bounds are inclusive.",
+      "type": "object",
+      "required": [
+        "valid_from",
+        "valid_through"
+      ],
+      "allOf": [
+        {
+          "$ref": "#/$defs/TimeInterval"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "A short human-readable heading naming the exception (for example, 'Thanksgiving'). Presentation metadata that does not affect schedule evaluation.",
+              "ucp_request": "omit"
+            },
+            "valid_from": {
+              "type": "string",
+              "format": "date",
+              "description": "The first local civil date to which this exception applies, interpreted in the containing Location's `timezone`.",
+              "ucp_request": "omit"
+            },
+            "valid_through": {
+              "type": "string",
+              "format": "date",
+              "description": "The last local civil date to which this exception applies, interpreted in the containing Location's `timezone`.",
+              "ucp_request": "omit"
+            }
+          }
+        }
+      ]
+    },
+    "Geo": {
+      "title": "Geo",
+      "description": "WGS 84 geographic coordinates in decimal degrees.",
+      "type": "object",
+      "required": [
+        "latitude",
+        "longitude"
+      ],
+      "properties": {
+        "latitude": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90,
+          "description": "WGS 84 latitude in decimal degrees."
+        },
+        "longitude": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180,
+          "description": "WGS 84 longitude in decimal degrees."
+        }
+      }
+    },
+    "Location": {
+      "title": "Location",
+      "description": "The full, rich representation of a physical business location. Builds on the Location Summary schema with discovery-centric details such as geographic coordinates, operating hours, timezone, and amenities.",
+      "type": "object",
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/LocationSummary"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "geo": {
+              "$ref": "#/$defs/Geo",
+              "description": "Geographic coordinates for the location.",
+              "ucp_request": "omit"
+            },
+            "amenities": {
+              "type": "object",
+              "description": "Static features, services, or capabilities of the Location, keyed by reverse-domain amenity identifier. Each value provides a buyer-facing description; the key alone defines amenity identity and filter matching.",
+              "propertyNames": {
+                "$ref": "#/$defs/AmenityType"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/Amenity"
+              },
+              "ucp_request": "omit"
+            },
+            "hours": {
+              "type": "array",
+              "description": "Regular weekly operating hours whose day and time values use this Location's canonical local civil-time frame. Multiple entries for the same day support split shifts. An omitted day has no regular interval beginning that day; an interval beginning on the preceding day can carry into it. Omission of the entire `hours` property means the regular schedule is unknown.",
+              "items": {
+                "$ref": "#/$defs/DailyHour"
+              },
+              "ucp_request": "omit"
+            },
+            "exception_hours": {
+              "type": "array",
+              "description": "Date-specific operating-hour exceptions, including full closures, whose date and time values use this Location's canonical local civil-time frame.",
+              "items": {
+                "$ref": "#/$defs/ExceptionHour"
+              },
+              "ucp_request": "omit"
+            },
+            "timezone": {
+              "type": "string",
+              "description": "The Business-owned IANA Time Zone Database identifier (e.g., 'America/New_York') defining this Location's canonical local civil-time frame for all returned schedule day, time, and date fields. The Business does not vary this canonical framing by the requesting Platform's or Buyer's timezone. Required when hours or exception_hours is present.",
+              "ucp_request": "omit"
+            }
+          }
+        }
+      ],
+      "if": {
+        "anyOf": [
+          {
+            "required": [
+              "hours"
+            ]
+          },
+          {
+            "required": [
+              "exception_hours"
+            ]
+          }
+        ]
+      },
+      "then": {
+        "required": [
+          "timezone"
+        ]
+      }
+    },
+    "Amenity": {
+      "title": "Amenity",
+      "description": "Buyer-facing presentation metadata for one amenity identifier. The containing map key, not this metadata, defines amenity identity and filter matching.",
+      "type": "object",
+      "required": [
+        "description"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Short, plain-text, buyer-facing label or phrase for the amenity, suitable for direct use in a compact list (e.g., 'Curbside pickup'). The Business SHOULD localize it for the request when possible. This content does not participate in amenity identity or filter matching.",
+          "ucp_request": "omit"
+        }
+      }
+    },
+    "LocationDistance": {
+      "title": "Location Distance",
+      "description": "An explicit-center inclusive-radius predicate. The Business compares the unrounded shortest WGS 84 ellipsoidal geodesic distance in RFC 7035 distance unit (meters) from `center` to the Location's authoritative `geo`; a value less than or equal to `max` matches. Implementations MAY use any algorithm that produces the WGS 84 inverse-geodesic result at sufficient precision such that the match outcome agrees with this unrounded comparison. No context, signals, IP, or `serves` fallback, radius clamping, tolerance, or operand substitution is permitted.",
+      "type": "object",
+      "required": [
+        "center",
+        "max"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "center": {
+          "$ref": "#/$defs/Geo",
+          "description": "Explicit center of the radius. The Platform MUST supply it; the Business MUST NOT derive it from context, signals, an IP address, or `serves`."
+        },
+        "max": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Inclusive maximum distance in RFC 7035 distance unit (meters). A Business unable to honor the supplied value MUST reject the request rather than clamp it or substitute another radius."
+        }
+      }
+    },
+    "LocationFilter": {
+      "title": "Location Filter",
+      "description": "Filter criteria to narrow Location Search and Lookup results. All supplied filters combine with AND.",
+      "type": "object",
+      "properties": {
+        "hours": {
+          "type": "object",
+          "description": "Filter by operating hours, evaluated at the one supplied instant.",
+          "required": [
+            "open_at"
+          ],
+          "properties": {
+            "open_at": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "(?:[Zz]|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$",
+              "description": "The RFC 3339 instant at which matching Locations must be open, expressed with `Z` or a numeric offset. The Platform selects the instant that represents the Buyer's intent. The Business evaluates it exactly as supplied using each Location's authoritative `timezone`; the supplied offset does not identify that timezone."
+            }
+          }
+        },
+        "amenities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AmenityType"
+          },
+          "description": "Filter by amenity identifier. A Location matches only when its `amenities` map contains every supplied identifier as an exact key; descriptions and namespace prefixes do not participate in matching."
+        },
+        "items": {
+          "type": "array",
+          "description": "Current item-availability filter. A candidate Location matches only when the Business can currently provide every referenced item at that Location; all references combine with AND.",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A non-empty, opaque Business-scoped item identifier."
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "LocationServes": {
+      "title": "Location Serves",
+      "description": "A one-entry map whose key names the authoritative service-target representation. The Platform MUST supply exactly one target form. A Business that cannot evaluate a well-formed target, or receives an extension form that was not negotiated, MUST reject the request rather than ignore it, fall back, or broaden results. This dictionary-like representation map cannot host an ambient `ucp` member.",
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "propertyNames": {
+        "anyOf": [
+          {
+            "const": "point"
+          },
+          {
+            "const": "address"
+          },
+          {
+            "$ref": "#/$defs/ReverseDomainName"
+          }
+        ]
+      },
+      "properties": {
+        "point": {
+          "$ref": "#/$defs/Geo",
+          "description": "WGS 84 coordinates of the service target.",
+          "ucp_request": "optional"
+        },
+        "address": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Locality"
+            },
+            {
+              "type": "object",
+              "anyOf": [
+                {
+                  "required": [
+                    "address_country"
+                  ],
+                  "properties": {
+                    "address_country": {
+                      "type": "string",
+                      "minLength": 1,
+                      "ucp_request": "required"
+                    }
+                  }
+                },
+                {
+                  "required": [
+                    "address_region"
+                  ],
+                  "properties": {
+                    "address_region": {
+                      "type": "string",
+                      "minLength": 1,
+                      "ucp_request": "required"
+                    }
+                  }
+                },
+                {
+                  "required": [
+                    "postal_code"
+                  ],
+                  "properties": {
+                    "postal_code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "ucp_request": "required"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "description": "Coarse locality of the service target.",
+          "ucp_request": "optional"
+        }
+      },
+      "additionalProperties": true
+    },
+    "NetworkTokenCredential": {
+      "title": "Network Token Credential",
+      "description": "A card-network token credential verified with a transaction cryptogram. The `number` field carries the network token or wallet-provisioned token rather than the underlying FPAN.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/PaymentCredential"
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "number",
+            "cryptogram"
+          ],
+          "properties": {
+            "type": {
+              "const": "network_token",
+              "description": "The credential type identifier for network token credentials."
+            },
+            "number": {
+              "type": "string",
+              "description": "Network token or wallet-provisioned token replacing the underlying FPAN.",
+              "examples": [
+                "5204240000004242"
+              ]
+            },
+            "expiry_month": {
+              "type": "integer",
+              "description": "The month of the token's expiration date (1-12)."
+            },
+            "expiry_year": {
+              "type": "integer",
+              "description": "The year of the token's expiration date."
+            },
+            "name": {
+              "type": "string",
+              "description": "Cardholder name.",
+              "examples": [
+                "Jane Doe"
+              ]
+            },
+            "cryptogram": {
+              "type": "string",
+              "description": "Transaction cryptogram or dynamic CVC (dCVV), in the long or short form expected by the card network or processor.",
+              "examples": [
+                "gXc5UCLnM6ckD7pjM1TdPA=="
+              ]
+            },
+            "eci_value": {
+              "type": "string",
+              "description": "Electronic Commerce Indicator / Security Level Indicator associated with the transaction.",
+              "examples": [
+                "07"
+              ]
+            },
+            "token_requestor_id": {
+              "type": "string",
+              "description": "Payment network token requestor identifier, when required by the processor or network-token program.",
+              "examples": [
+                "12345678901"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Pagination": {
+      "title": "Pagination",
+      "description": "Cursor-based pagination for list operations.",
+      "type": "object"
+    },
+    "PanCredential": {
+      "title": "PAN Credential",
+      "description": "A card credential carrying a funding primary account number (FPAN). Credential selection follows the shape of the value on the wire rather than its provenance: a network token surfaced in PAN form and verified with a `cvc` - as with credentials where a dynamic verification code proxies the cryptogram - is carried here, while a token verified with a discrete `cryptogram` uses Network Token Credential. This credential type MUST NOT be used for checkout, only with payment handlers that tokenize or encrypt credentials. CRITICAL: Both parties handling a PAN credential (sender and receiver) MUST be PCI DSS compliant. Transmission MUST use HTTPS/TLS with strong cipher suites.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/PaymentCredential"
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "number"
+          ],
+          "properties": {
+            "type": {
+              "const": "pan",
+              "description": "The credential type identifier for PAN credentials."
+            },
+            "number": {
+              "type": "string",
+              "description": "Funding primary account number (FPAN).",
+              "examples": [
+                "4242424242424242"
+              ]
+            },
+            "expiry_month": {
+              "type": "integer",
+              "description": "The month of the card's expiration date (1-12)."
+            },
+            "expiry_year": {
+              "type": "integer",
+              "description": "The year of the card's expiration date."
+            },
+            "name": {
+              "type": "string",
+              "description": "Cardholder name.",
+              "examples": [
+                "Jane Doe"
+              ]
+            },
+            "cvc": {
+              "type": "string",
+              "maxLength": 4,
+              "description": "Card verification code.",
+              "examples": [
+                "223"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "PaymentIdentity": {
+      "title": "Payment Identity",
+      "description": "Identity of a participant for token binding. The access_token uniquely identifies the participant whom tokens should be issued to.",
+      "type": "object",
+      "required": [
+        "access_token"
+      ],
+      "properties": {
+        "access_token": {
+          "type": "string",
+          "description": "Unique identifier for this participant, obtained during onboarding with the tokenizer."
+        }
+      }
+    },
+    "PaymentSchedule": {
+      "title": "Payment Schedule",
+      "description": "A single payment that settles part or all of the checkout under a payment term. Timing is stated in buyer-facing text; `type` and `due_at` are supplementary machine-readable signals derived from it.",
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "description",
+        "amount"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identifier for this payment schedule, unique within its payment term. Businesses SHOULD keep it stable across responses while the schedule remains the same payment."
+        },
+        "type": {
+          "type": "string",
+          "description": "Timing class, drawn from an open vocabulary. `immediate` is the only value with defined meaning: the payment is due when the checkout is completed. Any other value means the payment is not due at completion, and `description` states when it is due. Whether a due payment is authorized, captured, or settled at that moment is payment-handler behavior and outside this extension. Businesses MAY use additional values (e.g. `deferred`, `on_shipment`); Platforms MUST treat unrecognized values as not due at completion."
+        },
+        "description": {
+          "$ref": "#/$defs/Description",
+          "description": "Complete buyer-facing statement of when and how this payment is due. Businesses MUST make this field sufficient on its own: a Platform that recognizes no `type` value and reads no other field MUST be able to present this schedule correctly. Platforms MAY use `type` and `due_at` for enhanced presentation, but MUST NOT present derived timing that contradicts this field."
+        },
+        "due_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Absolute RFC 3339 date-time when this payment is due, when the Business can determine one at checkout. Supplementary to `description`, never a replacement for it. Omitted when the due date depends on a future event (e.g. 'due on delivery'); the timing is then stated in `description` alone."
+        },
+        "amount": {
+          "$ref": "#/$defs/Amount",
+          "description": "The amount charged when this payment is taken, inclusive of tax and every other charge, in the Checkout currency's minor units (ISO 4217). A schedule states an amount rather than a totals breakdown: the purchase is priced once at the Checkout, and a schedule moves part or all of that price. Where the selected term changes what the purchase costs, that difference appears in `checkout.totals`, not here."
+        }
+      }
+    },
+    "PaymentTerm": {
+      "title": "Payment Term",
+      "description": "A way of paying for the checkout: one or more payment schedules that together cover its total.",
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "schedules"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for this payment term within the checkout. Referenced by `payment.selected_term_id`."
+        },
+        "title": {
+          "type": "string",
+          "description": "Short label that distinguishes this term from its siblings (e.g. 'Pay now', 'Pay in 4', 'Deposit + balance at check-in')."
+        },
+        "description": {
+          "$ref": "#/$defs/Description",
+          "description": "Supplementary context for the title (e.g. 'Save 5% by paying today'). Directly renderable; MUST NOT repeat the title."
+        },
+        "schedules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PaymentSchedule"
+          },
+          "minItems": 1,
+          "description": "Payment schedules that settle this checkout under this term, in the order they come due."
+        }
+      }
+    },
+    "RequestConstraints": {
+      "title": "Request Constraints",
+      "description": "Binds the shared Constraint Expression grammar to data in the next UCP request to the same resource.",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "A complete RFC 9535 JSONPath query evaluated against the next logical UCP request to the same resource."
+        },
+        "required": {
+          "type": "array",
+          "description": "Property names required by the constrained object. Must be non-empty: an empty array applies no constraint.",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "properties": {
+          "type": "object",
+          "description": "Constraints keyed by property name. Must be non-empty: an empty object applies no constraint.",
+          "minProperties": 1,
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ConstraintExpression"
+              },
+              {
+                "$ref": "#/$defs/ConstraintExpressionValueConstraint"
+              }
+            ]
+          }
+        },
+        "anyOf": {
+          "type": "array",
+          "description": "Alternative Object Constraints. The constrained object must satisfy at least one. A branch must be non-empty: an empty branch is satisfied by every object and neutralizes the alternation.",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/ConstraintExpression",
+            "minProperties": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "TokenCredential": {
+      "title": "Token Credential",
+      "description": "Base token credential schema. Concrete payment handlers may extend this schema with additional fields and define their own constraints.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/PaymentCredential"
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "token"
+          ],
+          "properties": {
+            "type": {
+              "type": "string",
+              "description": "The specific type of token produced by the handler (e.g., 'stripe_token')."
+            },
+            "token": {
+              "type": "string",
+              "description": "The token value.",
+              "ucp_response": "omit"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

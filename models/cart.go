@@ -89,6 +89,23 @@ type CartResponse struct {
 	// Links contains optional merchant links (policies, FAQs).
 	Links []Link `json:"links,omitempty"`
 
+	// Policies are durable business rules (e.g. return/refund terms) that apply
+	// to the items in this cart. AppliesTo targets are relative to the response
+	// root; when absent or empty, refer to the URLs in Links. Added by the
+	// 2026-08-25 UCP release.
+	Policies []Policy `json:"policies,omitempty"`
+
+	// Actions are outstanding extension-defined Actions for this cart, keyed by
+	// reverse-domain Action type. Added by the 2026-08-25 UCP release.
+	Actions Actions `json:"actions,omitempty"`
+
+	// Buyer is optional buyer information echoed for personalized estimates.
+	Buyer *Buyer `json:"buyer,omitempty"`
+
+	// Attribution is the platform-emitted referral/conversion context echoed on
+	// the response.
+	Attribution Attribution `json:"attribution,omitempty"`
+
 	// ContinueURL provides a URL for cart handoff and session recovery.
 	// Enables sharing and human-in-the-loop flows.
 	ContinueURL string `json:"continue_url,omitempty"`

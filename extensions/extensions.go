@@ -82,6 +82,23 @@ type ExtendedCheckoutResponse struct {
 	// Discounts contains applied discounts (extension).
 	Discounts *models.DiscountsResponse `json:"discounts,omitempty"`
 
+	// Policies are durable business rules (e.g. return/refund terms) that apply
+	// to the items in this checkout (2026-08-25 UCP release).
+	Policies []models.Policy `json:"policies,omitempty"`
+
+	// Actions are outstanding extension-defined Actions for this checkout, keyed
+	// by reverse-domain Action type (e.g. a 3DS challenge). Payment
+	// Authentication extension (UCP spec change #458).
+	Actions models.Actions `json:"actions,omitempty"`
+
+	// PaymentTerms are alternative ways to pay for this checkout (e.g. "Pay now"
+	// vs "Pay in 4"). Payment Terms extension (UCP spec change #602).
+	PaymentTerms []models.PaymentTerm `json:"payment_terms,omitempty"`
+
+	// Loyalty is per-program loyalty membership and earning forecasts for this
+	// checkout, keyed by reverse-domain eligibility claim. Loyalty extension.
+	Loyalty models.Loyalty `json:"loyalty,omitempty"`
+
 	// Platform contains platform configuration.
 	Platform *PlatformConfig `json:"platform,omitempty"`
 

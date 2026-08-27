@@ -288,6 +288,32 @@ type Link struct {
 	Title string `json:"title,omitempty"`
 }
 
+// Policy is a durable business rule about the items in a response (return/refund
+// terms, warranty, and the like) at the time of purchase. Every policy carries a
+// Type (an open reverse-DNS vocabulary) and a Description so a platform can
+// present it without understanding type-specific fields. Policies are reference
+// data; the obligation to display a term to the buyer is carried by a messages[]
+// warning whose code equals the policy Type. Added by the 2026-08-25 UCP release.
+type Policy struct {
+	// Type is the policy type discriminator, an open reverse-DNS vocabulary.
+	// Well-known values: "dev.ucp.shopping.policy.return",
+	// "dev.ucp.shopping.policy.warranty". Platforms MUST tolerate unknown values.
+	Type string `json:"type"`
+
+	// Description is a human-readable policy summary in one or more formats.
+	// Required so a platform can present it without understanding type-specific
+	// fields.
+	Description Description `json:"description"`
+
+	// AppliesTo lists RFC 9535 JSONPath expressions identifying the nodes this
+	// policy applies to, relative to the embedding response root. When omitted,
+	// the policy applies to the entire response.
+	AppliesTo []string `json:"applies_to,omitempty"`
+
+	// URL is an optional link to the full policy document.
+	URL string `json:"url,omitempty"`
+}
+
 // MessagePresentation indicates how a warning should be rendered.
 type MessagePresentation string
 

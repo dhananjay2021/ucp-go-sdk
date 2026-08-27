@@ -11,29 +11,49 @@ package generated
 
 import "time"
 
-// Append-only event that exists independently of fulfillment. Typically represents
+// Outstanding extension-defined Action instances, keyed by reverse-domain Action
+// type, not extension name.
+type Actions map[string][]ActionsInstance
+
+// Common fields for one outstanding Action instance are id and optional config.
+// The extension declaring the Action type defines type-specific processing data
+// under config. Additional properties are permitted for forward compatibility.
+type ActionsInstance struct {
+	// Configuration defined by the extension that declares this Action type.
+	Config ActionsInstanceConfig `json:"config,omitempty,omitzero"`
+
+	// Identifier for this Action instance.
+	ID string `json:"id"`
+
+	AdditionalProperties interface{} `mapstructure:",remain"`
+}
+
+// Configuration defined by the extension that declares this Action type.
+type ActionsInstanceConfig map[string]interface{}
+
+// Post-order event that exists independently of fulfillment. Typically represents
 // money movements but can be any post-order change. Polymorphic type that can
 // optionally reference line items.
 type Adjustment struct {
-	// Amount in minor units (cents) for refunds, credits, price adjustments
-	// (optional).
-	Amount *int `json:"amount,omitempty"`
-
 	// Human-readable reason or description (e.g., 'Defective item', 'Customer
 	// requested').
-	Description *string `json:"description,omitempty"`
+	Description *string `json:"description,omitempty,omitzero"`
 
 	// Adjustment event identifier.
 	ID string `json:"id"`
 
 	// Which line items and quantities are affected (optional).
-	LineItems []AdjustmentLineItemsElem `json:"line_items,omitempty"`
+	LineItems []AdjustmentLineItemsElem `json:"line_items,omitempty,omitzero"`
 
 	// RFC 3339 timestamp when this adjustment occurred.
 	OccurredAt time.Time `json:"occurred_at"`
 
 	// Adjustment status.
 	Status AdjustmentStatus `json:"status"`
+
+	// Adjustment totals breakdown. Signed values - negative for money returned to
+	// buyer (refunds, credits), positive for additional charges (exchanges).
+	Totals []Total `json:"totals,omitempty,omitzero"`
 
 	// Type of adjustment (open string). Typically money-related like: refund, return,
 	// credit, price_adjustment, dispute, cancellation. Can be any value that makes
@@ -45,7 +65,17 @@ type AdjustmentLineItemsElem struct {
 	// Line item ID reference.
 	ID string `json:"id"`
 
-	// Quantity affected by this adjustment.
+	// The settled measurement this adjustment reconciles (for example, actual picked
+	// weight), present when the line's price settles by measurement. Its unit
+	// identity MUST match the line's pricing basis (`item.unit_price`
+	// measure/reference unit); no unit conversion. A pure price settlement uses
+	// `quantity: 0` together with `measure` and a totals delta.
+	Measure Measure `json:"measure,omitempty,omitzero"`
+
+	// Signed integer count of steps of the referenced line item's `quantity_unit`
+	// (`10^-scale` × `unit`); when `quantity_unit` is absent, it counts whole items
+	// (`each`). Negative values represent reductions (e.g. returns); positive values
+	// represent additions (e.g. exchanges).
 	Quantity int `json:"quantity"`
 }
 
@@ -55,365 +85,551 @@ const AdjustmentStatusCompleted AdjustmentStatus = "completed"
 const AdjustmentStatusFailed AdjustmentStatus = "failed"
 const AdjustmentStatusPending AdjustmentStatus = "pending"
 
-// Breakdown of how a discount amount was allocated to a specific target.
-type Allocation struct {
-	// Amount allocated to this target in minor (cents) currency units.
-	Amount int `json:"amount"`
+// Buyer-facing presentation metadata for one amenity identifier. The containing
+// map key, not this metadata, defines amenity identity and filter matching.
+type Amenity struct {
+	// Short, plain-text, buyer-facing label or phrase for the amenity, suitable for
+	// direct use in a compact list (e.g., 'Curbside pickup'). The Business SHOULD
+	// localize it for the request when possible. This content does not participate in
+	// amenity identity or filter matching.
+	Description string `json:"description"`
 
-	// JSONPath to the allocation target (e.g., '$.line_items[0]',
-	// '$.totals.shipping').
-	Path string `json:"path"`
+	AdditionalProperties interface{} `mapstructure:",remain"`
 }
 
-// The ap2 object included in checkout responses when AP2 is negotiated.
-type Ap2CheckoutResponse struct {
-	// Merchant's signature proving checkout terms are authentic.
-	MerchantAuthorization MerchantAuthorization `json:"merchant_authorization"`
+// Monetary amount in the currency's minor unit as defined by ISO 4217. Refer to
+// the currency's exponent to determine minor-to-major ratio (e.g., 2 for USD, 0
+// for JPY, 3 for KWD).
+type Amount int
+
+// Platform-emitted referral and conversion-event context — campaign identifiers,
+// click IDs, source/medium markers, etc. The same parameters platforms communicate
+// via URL query parameters in browser-based flows.
+type Attribution map[string]string
+
+// Availability of an item: whether it can be obtained, and a qualifying status.
+type Availability struct {
+	// Whether this can be obtained. See status for fulfillment details.
+	Available *bool `json:"available,omitempty,omitzero"`
+
+	// Qualifies available with fulfillment state. Well-known values: `in_stock`,
+	// `backorder`, `preorder`, `out_of_stock`, `discontinued`.
+	Status *string `json:"status,omitempty,omitzero"`
 }
 
-// The ap2 object included in complete_checkout requests when AP2 is negotiated.
-type Ap2CompleteRequest struct {
-	// SD-JWT+kb proving user authorized this checkout.
-	CheckoutMandate CheckoutMandate `json:"checkout_mandate"`
+// An instrument type available from a payment handler with optional constraints.
+type AvailablePaymentInstrument struct {
+	// A Constraint Expression describing the instrument this entry makes available.
+	// Keys in `properties` name members of the `constraint_target` declared by the
+	// instrument schema for this `type`. Requirements on submitted request data
+	// belong in `ucp.request_constraints` instead.
+	Constraints *ConstraintExpression `json:"constraints,omitempty,omitzero"`
+
+	// The instrument type identifier (e.g., 'card', 'gift_card'). References an
+	// instrument schema's type constant.
+	Type string `json:"type"`
 }
 
-// A discount that was successfully applied.
-type AppliedDiscount struct {
-	// Breakdown of where this discount was allocated. Sum of allocation amounts
-	// equals total amount.
-	Allocations []Allocation `json:"allocations,omitempty"`
-
-	// Total discount amount in minor (cents) currency units.
-	Amount int `json:"amount"`
-
-	// True if applied automatically by merchant rules (no code required).
-	Automatic bool `json:"automatic,omitempty"`
-
-	// The discount code. Omitted for automatic discounts.
-	Code *string `json:"code,omitempty"`
-
-	// Allocation method. 'each' = applied independently per item. 'across' = split
-	// proportionally by value.
-	Method *AppliedDiscountMethod `json:"method,omitempty"`
-
-	// Stacking order for discount calculation. Lower numbers applied first (1 =
-	// first).
-	Priority *int `json:"priority,omitempty"`
-
-	// Human-readable discount name (e.g., 'Summer Sale 20% Off').
-	Title string `json:"title"`
-}
-
-type AppliedDiscountMethod string
-
-const AppliedDiscountMethodAcross AppliedDiscountMethod = "across"
-const AppliedDiscountMethodEach AppliedDiscountMethod = "each"
-
-type Base struct {
-	// Capability-specific configuration (structure defined by each capability).
-	Config map[string]interface{} `json:"config,omitempty"`
-
-	// Parent capability this extends. Present for extensions, absent for root
-	// capabilities.
-	Extends *string `json:"extends,omitempty"`
-
-	// Stable capability identifier in reverse-domain notation (e.g.,
-	// dev.ucp.shopping.checkout). Used in capability negotiation.
-	Name *string `json:"name,omitempty"`
-
-	// URL to JSON Schema for this capability's payload.
-	Schema *string `json:"schema,omitempty"`
-
-	// URL to human-readable specification document.
-	Spec *string `json:"spec,omitempty"`
-
-	// Capability version in YYYY-MM-DD format.
-	Version *Version `json:"version,omitempty"`
-}
-
-// Binds a token to a specific checkout session and participant. Prevents token
-// reuse across different checkouts or participants.
+// Binds a credential or token to a specific capability resource. Prevents reuse
+// across different resources.
 type Binding struct {
-	// The checkout session identifier this token is bound to.
-	CheckoutID string `json:"checkout_id"`
+	// Opaque identifier of the bound resource within the owning capability, for
+	// example a checkout identifier.
+	ID string `json:"id"`
 
-	// The participant this token is bound to. Required when acting on behalf of
-	// another participant (e.g., agent tokenizing for merchant). Omit when the
-	// authenticated caller is the binding target.
-	Identity *PaymentIdentity `json:"identity,omitempty"`
+	// The capability that owns the bound resource, for example
+	// dev.ucp.shopping.checkout. MUST be a capability name declared in the UCP
+	// namespace.
+	Type ReverseDomainName `json:"type"`
+}
+
+// Business's fulfillment configuration.
+type BusinessFulfillmentConfig struct {
+	// Method-type combinations the business permits within one cart. Each inner array
+	// is a permitted set of method `type` values (e.g. shipping + pickup).
+	MethodCombinations [][]string `json:"method_combinations,omitempty,omitzero"`
+
+	// Method types that permit multiple destinations within one cart (e.g. split
+	// shipping across addresses). Listing a method permits it; an omitted method does
+	// not. Open — businesses MAY list any method type.
+	MultiDestination []BusinessFulfillmentConfigMultiDestinationElem `json:"multi_destination,omitempty,omitzero"`
+}
+
+type BusinessFulfillmentConfigMultiDestinationElem struct {
+	// Fulfillment method type (e.g. `shipping`, `pickup`). Optional per-method
+	// constraints MAY be added alongside.
+	Method string `json:"method"`
+
+	AdditionalProperties interface{} `mapstructure:",remain"`
+}
+
+// A business location fulfillment destination. Business-authored and
+// response-only: the Platform selects a location via `selected_destination_id`
+// rather than writing destinations.
+type BusinessLocationDestination struct {
+	// Physical address of the location.
+	Address *PostalAddress `json:"address,omitempty,omitzero"`
+
+	// Stable, opaque, Business-scoped Location identifier.
+	ID string `json:"id"`
+
+	// Buyer-facing, Business-owned display name.
+	Name string `json:"name"`
+
+	// Destination type discriminator. Response-only.
+	Type string `json:"type"`
+
+	AdditionalProperties interface{} `mapstructure:",remain"`
+}
+
+// Business-level configuration for split payments. Declaring the capability means
+// multiple payment instruments are supported; this config declares which
+// combinations are valid.
+type BusinessSplitPaymentsConfig struct {
+	// Array of valid instrument combinations. Each combination is an array of
+	// instrument groups. A payment is valid if it matches any combination.
+	AllowedCombinations [][]InstrumentGroup `json:"allowed_combinations"`
 }
 
 type Buyer struct {
 	// Email of the buyer.
-	Email *string `json:"email,omitempty"`
+	Email *string `json:"email,omitempty,omitzero"`
 
 	// First name of the buyer.
-	FirstName *string `json:"first_name,omitempty"`
-
-	// Optional, buyer's full name (if first_name or last_name fields are present they
-	// take precedence).
-	FullName *string `json:"full_name,omitempty"`
+	FirstName *string `json:"first_name,omitempty,omitzero"`
 
 	// Last name of the buyer.
-	LastName *string `json:"last_name,omitempty"`
+	LastName *string `json:"last_name,omitempty,omitzero"`
 
 	// E.164 standard.
-	PhoneNumber *string `json:"phone_number,omitempty"`
+	PhoneNumber *string `json:"phone_number,omitempty,omitzero"`
 
 	AdditionalProperties interface{} `mapstructure:",remain"`
 }
 
-// Buyer object extended with consent tracking.
-type Buyer_1 interface{}
+// Extends the buyer object with per-purpose consent. Each purpose is keyed by a
+// reverse-DNS identifier and carries the current `granted` state, the `source` of
+// that state (business default or platform-captured buyer decision), a
+// `description`, optional `links`, and optional `segments` for finer-grained
+// channel, vendor, or program decisions scoped to that purpose.
+type BuyerConsentExtension interface{}
 
-// Buyer object extended with consent tracking.
-type Buyer_2 interface{}
+type CapabilityBase interface{}
 
-// Buyer object extended with consent tracking.
-type Buyer_3 interface{}
+// Capability reference in responses. Only name/version required to confirm active
+// capabilities.
+type CapabilityResponseSchema interface{}
 
-// A card credential containing sensitive payment card details including raw
-// Primary Account Numbers (PANs). This credential type MUST NOT be used for
-// checkout, only with payment handlers that tokenize or encrypt credentials.
-// CRITICAL: Both parties handling CardCredential (sender and receiver) MUST be PCI
-// DSS compliant. Transmission MUST use HTTPS/TLS with strong cipher suites.
-type CardCredential struct {
-	// The type of card number. Network tokens are preferred with fallback to FPAN.
-	// See PCI Scope for more details.
-	CardNumberType CardCredentialCardNumberType `json:"card_number_type"`
+// Deprecated: use PAN Credential (`pan_credential.json`) or Network Token
+// Credential (`network_token_credential.json`). A card credential containing
+// sensitive payment card details including raw Primary Account Numbers (PANs).
+// This credential type MUST NOT be used for checkout, only with payment handlers
+// that tokenize or encrypt credentials. CRITICAL: Both parties handling
+// CardCredential (sender and receiver) MUST be PCI DSS compliant. Transmission
+// MUST use HTTPS/TLS with strong cipher suites.
+type CardCredential interface{}
 
-	// Cryptogram provided with network tokens.
-	Cryptogram *string `json:"cryptogram,omitempty"`
+// A basic card payment instrument with visible card details. Can be inherited by a
+// handler's instrument schema to define handler-specific display details or more
+// complex credential structures.
+type CardPaymentInstrument interface{}
 
-	// Card CVC number.
-	Cvc *string `json:"cvc,omitempty"`
+// Shopping cart with estimated pricing before checkout. Lightweight pre-purchase
+// exploration with no payment info or complex status states.
+type Cart struct {
+	// Outstanding extension-defined Actions for this cart.
+	Actions Actions `json:"actions,omitempty,omitzero"`
 
-	// Electronic Commerce Indicator / Security Level Indicator provided with network
-	// tokens.
-	EciValue *string `json:"eci_value,omitempty"`
+	// Attribution corresponds to the JSON schema field "attribution".
+	Attribution Attribution `json:"attribution,omitempty,omitzero"`
 
-	// The month of the card's expiration date (1-12).
-	ExpiryMonth *int `json:"expiry_month,omitempty"`
+	// Optional buyer information for personalized estimates.
+	Buyer *Buyer `json:"buyer,omitempty,omitzero"`
 
-	// The year of the card's expiration date.
-	ExpiryYear *int `json:"expiry_year,omitempty"`
+	// Buyer signals for localization (country, region, postal_code). Merchant uses
+	// for pricing, availability, currency. Falls back to geo-IP if omitted.
+	Context *Context `json:"context,omitempty,omitzero"`
 
-	// Cardholder name.
-	Name *string `json:"name,omitempty"`
+	// URL for cart handoff and session recovery. Enables sharing and
+	// human-in-the-loop flows.
+	ContinueURL *string `json:"continue_url,omitempty,omitzero"`
 
-	// Card number.
-	Number *string `json:"number,omitempty"`
-
-	// The credential type identifier for card credentials.
-	Type interface{} `json:"type"`
-}
-
-type CardCredentialCardNumberType string
-
-const CardCredentialCardNumberTypeDpan CardCredentialCardNumberType = "dpan"
-const CardCredentialCardNumberTypeFpan CardCredentialCardNumberType = "fpan"
-const CardCredentialCardNumberTypeNetworkToken CardCredentialCardNumberType = "network_token"
-
-// Checkout extended with consent tracking via buyer object.
-type Checkout interface{}
-
-// Base checkout schema. Extensions compose onto this using allOf.
-type CheckoutCreateRequest struct {
-	// Representation of the buyer.
-	Buyer *Buyer `json:"buyer,omitempty"`
-
-	// ISO 4217 currency code.
+	// ISO 4217 currency code. Determined by merchant based on context or geo-IP.
 	Currency string `json:"currency"`
 
-	// List of line items being checked out.
-	LineItems []LineItemCreateRequest `json:"line_items"`
+	// Cart expiry timestamp (RFC 3339). Optional.
+	ExpiresAt *time.Time `json:"expires_at,omitempty,omitzero"`
 
-	// Payment corresponds to the JSON schema field "payment".
-	Payment PaymentCreateRequest `json:"payment"`
+	// Unique cart identifier.
+	ID string `json:"id"`
+
+	// Cart line items. Same structure as checkout. Full replacement on update.
+	LineItems []LineItem `json:"line_items"`
+
+	// Optional merchant links (policies, FAQs).
+	Links []Link `json:"links,omitempty,omitzero"`
+
+	// Validation messages, warnings, or informational notices.
+	Messages []Message `json:"messages,omitempty,omitzero"`
+
+	// Policies (e.g., return/refund terms) that apply to the items in this cart.
+	// `applies_to` targets are relative to the response root; when absent or empty,
+	// refer to the URLs in `links[]`.
+	Policies []Policy `json:"policies,omitempty,omitzero"`
+
+	// Signals corresponds to the JSON schema field "signals".
+	Signals *Signals `json:"signals,omitempty,omitzero"`
+
+	// Estimated cost breakdown. May be partial if shipping/tax not yet calculable.
+	Totals Totals `json:"totals"`
+
+	// Ucp corresponds to the JSON schema field "ucp".
+	Ucp UcpCartResponseSchema `json:"ucp"`
 
 	AdditionalProperties interface{} `mapstructure:",remain"`
 }
 
-// SD-JWT+kb credential in `ap2.checkout_mandate`. Proving user authorization for
-// the checkout. Contains the full checkout including `ap2.merchant_authorization`.
-type CheckoutMandate string
+// Product/variant lookup by identifier. Supports batch retrieval (lookup_catalog)
+// and single-product detail (get_product).
+type CatalogLookup map[string]interface{}
+
+// Product catalog search capability.
+type CatalogSearch map[string]interface{}
+
+// A product category with optional taxonomy identifier.
+type Category struct {
+	// Source taxonomy. Well-known values: `google_product_category`, `shopify`,
+	// `merchant`.
+	Taxonomy *string `json:"taxonomy,omitempty,omitzero"`
+
+	// Category value or path (e.g., 'Apparel > Shirts', '1604').
+	Value string `json:"value"`
+}
 
 // Base checkout schema. Extensions compose onto this using allOf.
-type CheckoutResponse struct {
+type Checkout struct {
+	// Outstanding extension-defined Actions for this checkout.
+	Actions Actions `json:"actions,omitempty,omitzero"`
+
+	// Attribution corresponds to the JSON schema field "attribution".
+	Attribution Attribution `json:"attribution,omitempty,omitzero"`
+
 	// Representation of the buyer.
-	Buyer *Buyer `json:"buyer,omitempty"`
+	Buyer *Buyer `json:"buyer,omitempty,omitzero"`
+
+	// Context corresponds to the JSON schema field "context".
+	Context *Context `json:"context,omitempty,omitzero"`
 
 	// URL for checkout handoff and session recovery. MUST be provided when status is
 	// requires_escalation. See specification for format and availability
 	// requirements.
-	ContinueURL *string `json:"continue_url,omitempty"`
+	ContinueURL *string `json:"continue_url,omitempty,omitzero"`
 
-	// ISO 4217 currency code.
+	// ISO 4217 currency code reflecting the merchant's market determination. Derived
+	// from address, context, and geo IP—buyers provide signals, merchants determine
+	// currency.
 	Currency string `json:"currency"`
 
 	// RFC 3339 expiry timestamp. Default TTL is 6 hours from creation if not sent.
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty,omitzero"`
 
 	// Unique identifier of the checkout session.
 	ID string `json:"id"`
 
 	// List of line items being checked out.
-	LineItems []LineItemResponse `json:"line_items"`
+	LineItems []LineItem `json:"line_items"`
 
 	// Links to be displayed by the platform (Privacy Policy, TOS). Mandatory for
 	// legal compliance.
 	Links []Link `json:"links"`
 
 	// List of messages with error and info about the checkout session state.
-	Messages []map[string]interface{} `json:"messages,omitempty"`
+	Messages []Message `json:"messages,omitempty,omitzero"`
 
 	// Details about an order created for this checkout session.
-	Order *OrderConfirmation `json:"order,omitempty"`
+	Order *OrderConfirmation `json:"order,omitempty,omitzero"`
 
 	// Payment corresponds to the JSON schema field "payment".
-	Payment PaymentResponse `json:"payment"`
+	Payment *Payment `json:"payment,omitempty,omitzero"`
 
-	// Checkout state indicating the current phase and required action. See Checkout
-	// Status lifecycle documentation for state transition details.
-	Status CheckoutResponseStatus `json:"status"`
+	// Policies (e.g., return/refund terms) that apply to the items in this checkout.
+	// `applies_to` targets are relative to the response root; when absent or empty,
+	// refer to the URLs in `links[]`.
+	Policies []Policy `json:"policies,omitempty,omitzero"`
+
+	// Signals corresponds to the JSON schema field "signals".
+	Signals *Signals `json:"signals,omitempty,omitzero"`
+
+	// Checkout state indicating the current phase and required processing. See
+	// Checkout Status lifecycle documentation for state transition details.
+	Status CheckoutStatus `json:"status"`
 
 	// Different cart totals.
-	Totals []TotalResponse `json:"totals"`
+	Totals Totals `json:"totals"`
 
 	// Ucp corresponds to the JSON schema field "ucp".
-	Ucp ResponseCheckout `json:"ucp"`
+	Ucp UcpCheckoutResponseSchema `json:"ucp"`
 
 	AdditionalProperties interface{} `mapstructure:",remain"`
 }
 
-type CheckoutResponseStatus string
+type CheckoutStatus string
 
-const CheckoutResponseStatusCanceled CheckoutResponseStatus = "canceled"
-const CheckoutResponseStatusCompleteInProgress CheckoutResponseStatus = "complete_in_progress"
-const CheckoutResponseStatusCompleted CheckoutResponseStatus = "completed"
-const CheckoutResponseStatusIncomplete CheckoutResponseStatus = "incomplete"
-const CheckoutResponseStatusReadyForComplete CheckoutResponseStatus = "ready_for_complete"
-const CheckoutResponseStatusRequiresEscalation CheckoutResponseStatus = "requires_escalation"
+const CheckoutStatusCanceled CheckoutStatus = "canceled"
+const CheckoutStatusCompleteInProgress CheckoutStatus = "complete_in_progress"
+const CheckoutStatusCompleted CheckoutStatus = "completed"
+const CheckoutStatusIncomplete CheckoutStatus = "incomplete"
+const CheckoutStatusReadyForComplete CheckoutStatus = "ready_for_complete"
+const CheckoutStatusRequiresEscalation CheckoutStatus = "requires_escalation"
 
-// Checkout extended with AP2 embedded signature support.
-type CheckoutResponseWithAp2 interface{}
+// A closed JSON Schema Draft 2020-12 constraint expression with Object and Value
+// Constraint positions.
+type ConstraintExpression struct {
+	// Alternative Object Constraints. The constrained object must satisfy at least
+	// one. A branch must be non-empty: an empty branch is satisfied by every object
+	// and neutralizes the alternation.
+	AnyOf []ConstraintExpression `json:"anyOf,omitempty,omitzero"`
 
-// Base checkout schema. Extensions compose onto this using allOf.
-type CheckoutUpdateRequest struct {
-	// Representation of the buyer.
-	Buyer *Buyer `json:"buyer,omitempty"`
+	// Constraints keyed by property name. Must be non-empty: an empty object applies
+	// no constraint.
+	Properties ConstraintExpressionProperties `json:"properties,omitempty,omitzero"`
 
-	// ISO 4217 currency code.
-	Currency string `json:"currency"`
+	// Property names required by the constrained object. Must be non-empty: an empty
+	// array applies no constraint.
+	Required []string `json:"required,omitempty,omitzero"`
+}
 
-	// Unique identifier of the checkout session.
-	ID string `json:"id"`
+// Constraints keyed by property name. Must be non-empty: an empty object applies
+// no constraint.
+type ConstraintExpressionProperties map[string]interface{}
 
-	// List of line items being checked out.
-	LineItems []LineItemUpdateRequest `json:"line_items"`
+// A Value Constraint containing `enum`, `const`, or both.
+type ConstraintExpressionValueConstraint struct {
+	// Const corresponds to the JSON schema field "const".
+	Const interface{} `json:"const,omitempty,omitzero"`
 
-	// Payment corresponds to the JSON schema field "payment".
-	Payment PaymentUpdateRequest `json:"payment"`
+	// A non-empty array of unique JSON values.
+	Enum []interface{} `json:"enum,omitempty,omitzero"`
+}
+
+type ConstraintExpressionValueConstraint_0 map[string]interface{}
+
+type ConstraintExpressionValueConstraint_1 map[string]interface{}
+
+// Provisional buyer signals for relevance and localization—not authoritative data.
+// Businesses SHOULD use these values when verified inputs (e.g., shipping address)
+// are absent, and MAY ignore or down-rank them if inconsistent with
+// higher-confidence signals (authenticated account, risk detection) or regulatory
+// constraints (export controls). Eligibility and policy enforcement MUST occur at
+// checkout time using binding transaction data. Context SHOULD be non-identifying
+// and can be disclosed progressively—coarse signals early, finer resolution as the
+// session progresses. Higher-resolution data (shipping address, billing address)
+// supersedes context.
+type Context struct {
+	// The country, as a 2-letter ISO 3166-1 alpha-2 code (e.g. "US"). A 3-letter
+	// alpha-3 code or full country name MAY also be used.
+	AddressCountry *string `json:"address_country,omitempty,omitzero"`
+
+	// The first-level administrative region within the country (e.g. a state or
+	// province such as California).
+	AddressRegion *string `json:"address_region,omitempty,omitzero"`
+
+	// Preferred currency (ISO 4217, e.g., 'EUR', 'USD'). Businesses determine
+	// presentment currency from context and authoritative signals; this hint MAY
+	// inform selection in multi-currency markets. Also serves as the denomination for
+	// price filter values — platforms SHOULD include this field when sending price
+	// filters. Response prices include explicit currency confirming the resolution.
+	Currency *string `json:"currency,omitempty,omitzero"`
+
+	// Buyer claims about eligible benefits such as loyalty membership, payment
+	// instrument perks, and similar. Recognized claims MAY inform the Business
+	// response (e.g., member-only product availability, adjusted pricing in catalog,
+	// provisional discounts at cart or checkout). Businesses MUST ignore unrecognized
+	// values without error. Values MUST use reverse-domain naming (e.g.,
+	// 'com.example.loyalty_gold', 'org.school.student') and MUST be non-identifying.
+	Eligibility []ReverseDomainName `json:"eligibility,omitempty,omitzero"`
+
+	// Background context describing buyer's intent (e.g., 'looking for a gift under
+	// $50', 'need something durable for outdoor use'). Informs relevance,
+	// recommendations, and personalization.
+	Intent *string `json:"intent,omitempty,omitzero"`
+
+	// Preferred language for content. Use IETF BCP 47 language tags (e.g., 'en',
+	// 'fr-CA', 'zh-Hans'). For REST, equivalent to Accept-Language header—platforms
+	// SHOULD fall back to Accept-Language when this field is absent; when provided,
+	// overrides Accept-Language. Businesses MAY return content in a different
+	// language if unavailable.
+	Language *string `json:"language,omitempty,omitzero"`
+
+	// Stable, opaque identifier for a Location in the Business's namespace. This
+	// provisional, non-binding hint is distinct from the Buyer's locality. The
+	// operation specification or an active capability/extension defines its effects.
+	// A common example in retail shopping is the default home store ID selected and
+	// saved by the user when purchasing groceries.
+	Location *string `json:"location,omitempty,omitzero"`
+
+	// Buyer-preferred payment handlers in priority order (most preferred first). Each
+	// entry names a handler advertised in the Business profile's
+	// `ucp.payment_handlers`, optionally narrowed to preferred instrument types. The
+	// Business SHOULD use it to preselect or prioritize the handler (and type, when
+	// given) and MAY ignore unavailable or ineligible entries; unrecognized values
+	// MUST be ignored without error.
+	Payment []ContextPaymentElem `json:"payment,omitempty,omitzero"`
+
+	// The postal code (e.g. "94043").
+	PostalCode *string `json:"postal_code,omitempty,omitzero"`
 
 	AdditionalProperties interface{} `mapstructure:",remain"`
 }
 
-// Checkout extended with consent tracking via buyer object.
-type Checkout_1 interface{}
+type ContextPaymentElem struct {
+	// Handler registry key advertised in the Business profile's
+	// `ucp.payment_handlers`.
+	Handler ReverseDomainName `json:"handler"`
 
-// Checkout extended with consent tracking via buyer object.
-type Checkout_2 interface{}
-
-// Checkout extended with discount capability.
-type Checkout_3 interface{}
-
-// Checkout extended with discount capability.
-type Checkout_4 interface{}
-
-// Checkout extended with discount capability.
-type Checkout_5 interface{}
-
-// Checkout extended with hierarchical fulfillment.
-type Checkout_6 interface{}
-
-// Checkout extended with hierarchical fulfillment.
-type Checkout_7 interface{}
-
-// Checkout extended with hierarchical fulfillment.
-type Checkout_8 interface{}
-
-// Extension fields for complete_checkout when AP2 is negotiated.
-type CompleteRequestWithAp2 struct {
-	// AP2 extension data including checkout mandate.
-	Ap2 *Ap2CompleteRequest `json:"ap2,omitempty"`
+	// Optional preferred instrument types for this handler, in priority order,
+	// aligned with the handler's advertised `payment_instrument.type` values (for
+	// example `card` or `bank`). Unrecognized values MUST be ignored.
+	Types []string `json:"types,omitempty,omitzero"`
 }
 
-// User consent states for data processing
-type Consent struct {
-	// Consent for analytics and performance tracking.
-	Analytics *bool `json:"analytics,omitempty"`
+// A regular weekly operating interval. Its `day`, `opens`, and `closes` are
+// recurring local civil values interpreted in the containing Location's
+// `timezone`. Multiple entries for the same day support split shifts.
+type DailyHour struct {
+	// Closing time in 24-hour HH:MM format.
+	Closes string `json:"closes"`
 
-	// Consent for marketing communications.
-	Marketing *bool `json:"marketing,omitempty"`
+	// A stable UCP day-of-week identifier for the day on which this recurring local
+	// civil-time interval begins in the containing Location's `timezone`. It is not
+	// localized display text.
+	Day DailyHourDay `json:"day"`
 
-	// Consent for storing user preferences.
-	Preferences *bool `json:"preferences,omitempty"`
-
-	// Consent for selling data to third parties (CCPA).
-	SaleOfData *bool `json:"sale_of_data,omitempty"`
+	// Opening time in 24-hour HH:MM format.
+	Opens string `json:"opens"`
 }
 
-// Discount codes input and applied discounts output.
-type DiscountsObject struct {
-	// Discounts successfully applied (code-based and automatic).
-	Applied []AppliedDiscount `json:"applied,omitempty"`
+type DailyHourDay string
 
-	// Discount codes to apply. Case-insensitive. Replaces previously submitted codes.
-	// Send empty array to clear.
-	Codes []string `json:"codes,omitempty"`
+const DailyHourDayFriday DailyHourDay = "friday"
+const DailyHourDayMonday DailyHourDay = "monday"
+const DailyHourDaySaturday DailyHourDay = "saturday"
+const DailyHourDaySunday DailyHourDay = "sunday"
+const DailyHourDayThursday DailyHourDay = "thursday"
+const DailyHourDayTuesday DailyHourDay = "tuesday"
+const DailyHourDayWednesday DailyHourDay = "wednesday"
+
+// Description content in one or more formats. At least one format must be
+// provided.
+type Description struct {
+	// HTML-formatted content. Security: Platforms MUST sanitize before
+	// rendering—strip scripts, event handlers, and untrusted elements. Treat all rich
+	// text as untrusted input.
+	Html *string `json:"html,omitempty,omitzero"`
+
+	// Markdown-formatted content.
+	Markdown *string `json:"markdown,omitempty,omitzero"`
+
+	// Plain text content.
+	Plain *string `json:"plain,omitempty,omitzero"`
 }
 
-// Full capability declaration for discovery profiles. Includes spec/schema URLs
-// for agent fetching.
-type Discovery interface{}
+// An option value with availability signals relative to the current selections.
+// Used in get_product responses where selected context exists.
+type DetailOptionValue struct {
+	// Whether a variant matching this value and the current option selections is
+	// purchasable.
+	Available *bool `json:"available,omitempty,omitzero"`
 
-// Full UCP metadata for /.well-known/ucp discovery.
-type DiscoveryProfile struct {
-	// Supported capabilities and extensions.
-	Capabilities []DiscoveryProfileCapabilitiesElem `json:"capabilities"`
+	// Whether a variant matching this value and the current option selections exists
+	// in the catalog.
+	Exists *bool `json:"exists,omitempty,omitzero"`
 
-	// Services corresponds to the JSON schema field "services".
-	Services map[string]UCPService `json:"services"`
+	// Optional server-assigned identifier for this option value. When present in a
+	// selected_option, the server SHOULD use it for matching instead of label.
+	ID *string `json:"id,omitempty,omitzero"`
 
-	// Version corresponds to the JSON schema field "version".
-	Version Version `json:"version"`
+	// Display text for this option value (e.g., 'Small', 'Blue').
+	Label string `json:"label"`
 }
 
-type DiscoveryProfileCapabilitiesElem interface{}
+// Extends Cart and Checkout with discount support, including discount codes,
+// automatic discounts, and eligibility-triggered provisional discounts.
+type DiscountExtension interface{}
 
+// Per-session configuration for embedded transport binding. Allows businesses to
+// vary EP availability and delegations based on cart contents, agent
+// authorization, or policy.
+type EmbeddedTransportConfig struct {
+	// Color schemes the business supports. Hosts use ec_color_scheme query parameter
+	// to request a scheme from this list.
+	ColorScheme []EmbeddedTransportConfigColorSchemeElem `json:"color_scheme,omitempty,omitzero"`
+
+	// Delegations the business allows. At service-level, declares available
+	// delegations. In UCP responses, confirms accepted delegations for this session.
+	Delegate []string `json:"delegate,omitempty,omitzero"`
+}
+
+type EmbeddedTransportConfigColorSchemeElem string
+
+const EmbeddedTransportConfigColorSchemeElemDark EmbeddedTransportConfigColorSchemeElem = "dark"
+const EmbeddedTransportConfigColorSchemeElemLight EmbeddedTransportConfigColorSchemeElem = "light"
+
+// Error code identifying the type of error. Standard errors are defined in
+// capability specifications (see examples) and have standardized semantics;
+// freeform codes are permitted.
 type ErrorCode string
 
-const ErrorCodeAgentMissingKey ErrorCode = "agent_missing_key"
-const ErrorCodeMandateExpired ErrorCode = "mandate_expired"
-const ErrorCodeMandateInvalidSignature ErrorCode = "mandate_invalid_signature"
-const ErrorCodeMandateRequired ErrorCode = "mandate_required"
-const ErrorCodeMandateScopeMismatch ErrorCode = "mandate_scope_mismatch"
-const ErrorCodeMerchantAuthorizationInvalid ErrorCode = "merchant_authorization_invalid"
-const ErrorCodeMerchantAuthorizationMissing ErrorCode = "merchant_authorization_missing"
+// Generic error response when business logic prevents resource creation or failed
+// to retrieve resource. Used when no valid resource can be established.
+type ErrorResponse struct {
+	// URL for buyer handoff or session recovery.
+	ContinueURL *string `json:"continue_url,omitempty,omitzero"`
+
+	// Array of messages describing why the operation failed.
+	Messages []Message `json:"messages"`
+
+	// UCP protocol metadata. Status MUST be 'error' for error response.
+	Ucp UcpError `json:"ucp"`
+}
+
+// A date-specific operating interval or full closure. Its `valid_from`,
+// `valid_through`, `opens`, and `closes` are local civil values interpreted in the
+// containing Location's `timezone`. Date bounds are inclusive.
+type ExceptionHour struct {
+	// Closing time in 24-hour HH:MM format.
+	Closes *string `json:"closes,omitempty,omitzero"`
+
+	// Opening time in 24-hour HH:MM format.
+	Opens *string `json:"opens,omitempty,omitzero"`
+
+	// A short human-readable heading naming the exception (for example,
+	// 'Thanksgiving'). Presentation metadata that does not affect schedule
+	// evaluation.
+	Title *string `json:"title,omitempty,omitzero"`
+
+	// The first local civil date to which this exception applies, interpreted in the
+	// containing Location's `timezone`.
+	ValidFrom string `json:"valid_from"`
+
+	// The last local civil date to which this exception applies, interpreted in the
+	// containing Location's `timezone`.
+	ValidThrough string `json:"valid_through"`
+}
 
 // Buyer-facing fulfillment expectation representing logical groupings of items
 // (e.g., 'package'). Can be split, merged, or adjusted post-order to set buyer
 // expectations for when/how items arrive.
 type Expectation struct {
 	// Human-readable delivery description (e.g., 'Arrives in 5-8 business days').
-	Description *string `json:"description,omitempty"`
+	Description *string `json:"description,omitempty,omitzero"`
 
 	// Delivery destination address.
 	Destination PostalAddress `json:"destination"`
 
 	// When this expectation can be fulfilled: 'now' or ISO 8601 timestamp for future
 	// date (backorder, pre-order).
-	FulfillableOn *string `json:"fulfillable_on,omitempty"`
+	FulfillableOn *string `json:"fulfillable_on,omitempty,omitzero"`
 
 	// Expectation identifier.
 	ID string `json:"id"`
@@ -421,57 +637,88 @@ type Expectation struct {
 	// Which line items and quantities are in this expectation.
 	LineItems []ExpectationLineItemsElem `json:"line_items"`
 
-	// Delivery method type (shipping, pickup, digital).
-	MethodType ExpectationMethodType `json:"method_type"`
+	// Delivery method type. Well-known values: `shipping`, `pickup`, `digital`;
+	// additional values MAY be used.
+	MethodType string `json:"method_type"`
 }
 
 type ExpectationLineItemsElem struct {
 	// Line item ID reference.
 	ID string `json:"id"`
 
-	// Quantity of this item in this expectation.
+	// Integer count of steps of the referenced line item's `quantity_unit`
+	// (`10^-scale` × `unit`); when `quantity_unit` is absent, it counts whole items
+	// (`each`).
 	Quantity int `json:"quantity"`
 }
 
-type ExpectationMethodType string
+// Container for fulfillment methods and availability.
+type Fulfillment struct {
+	// Inventory availability hints.
+	AvailableMethods []FulfillmentAvailableMethod `json:"available_methods,omitempty,omitzero"`
 
-const ExpectationMethodTypeDigital ExpectationMethodType = "digital"
-const ExpectationMethodTypePickup ExpectationMethodType = "pickup"
-const ExpectationMethodTypeShipping ExpectationMethodType = "shipping"
+	// Fulfillment methods for cart items.
+	Methods []FulfillmentMethod `json:"methods,omitempty,omitzero"`
+}
 
 // Inventory availability hint for a fulfillment method type.
-type FulfillmentAvailableMethodResponse struct {
+type FulfillmentAvailableMethod struct {
 	// Human-readable availability info (e.g., 'Available for pickup at Downtown Store
 	// today').
-	Description *string `json:"description,omitempty"`
+	Description *string `json:"description,omitempty,omitzero"`
 
 	// 'now' for immediate availability, or ISO 8601 date for future (preorders,
 	// transfers).
-	FulfillableOn *string `json:"fulfillable_on,omitempty"`
+	FulfillableOn FulfillmentAvailableMethodFulfillableOn `json:"fulfillable_on,omitempty,omitzero"`
 
 	// Line items available for this fulfillment method.
 	LineItemIds []string `json:"line_item_ids"`
 
-	// Fulfillment method type this availability applies to.
-	Type FulfillmentAvailableMethodResponseType `json:"type"`
+	// Fulfillment method type this availability applies to. Well-known values:
+	// `shipping`, `pickup`; businesses MAY use additional values.
+	Type string `json:"type"`
 
 	AdditionalProperties interface{} `mapstructure:",remain"`
 }
 
-type FulfillmentAvailableMethodResponseType string
+// 'now' for immediate availability, or ISO 8601 date for future (preorders,
+// transfers).
+type FulfillmentAvailableMethodFulfillableOn *string
 
-const FulfillmentAvailableMethodResponseTypePickup FulfillmentAvailableMethodResponseType = "pickup"
-const FulfillmentAvailableMethodResponseTypeShipping FulfillmentAvailableMethodResponseType = "shipping"
+// A destination for fulfillment.
+type FulfillmentDestination interface{}
+
+// A specific destination, named by value or by reference: a coarse locality
+// (`address_country` / `address_region` / `postal_code`), or a `location` id.
+// Platforms SHOULD provide one or the other, not both; if both are present, a
+// business SHOULD use the more specific — typically `location`.
+type FulfillmentDestinationFilter struct {
+	// The country, as a 2-letter ISO 3166-1 alpha-2 code (e.g. "US"). A 3-letter
+	// alpha-3 code or full country name MAY also be used.
+	AddressCountry *string `json:"address_country,omitempty,omitzero"`
+
+	// The first-level administrative region within the country (e.g. a state or
+	// province such as California).
+	AddressRegion *string `json:"address_region,omitempty,omitzero"`
+
+	// A reference to the destination (e.g. store, pickup location, saved address).
+	Location *string `json:"location,omitempty,omitzero"`
+
+	// The postal code (e.g. "94043").
+	PostalCode *string `json:"postal_code,omitempty,omitzero"`
+
+	AdditionalProperties interface{} `mapstructure:",remain"`
+}
 
 // Append-only fulfillment event representing an actual shipment. References line
 // items by ID.
 type FulfillmentEvent struct {
 	// Carrier name (e.g., 'FedEx', 'USPS').
-	Carrier *string `json:"carrier,omitempty"`
+	Carrier *string `json:"carrier,omitempty,omitzero"`
 
 	// Human-readable description of the shipment status or delivery information
 	// (e.g., 'Delivered to front door', 'Out for delivery').
-	Description *string `json:"description,omitempty"`
+	Description *string `json:"description,omitempty,omitzero"`
 
 	// Fulfillment event identifier.
 	ID string `json:"id"`
@@ -483,10 +730,10 @@ type FulfillmentEvent struct {
 	OccurredAt time.Time `json:"occurred_at"`
 
 	// Carrier tracking number (required if type != processing).
-	TrackingNumber *string `json:"tracking_number,omitempty"`
+	TrackingNumber *string `json:"tracking_number,omitempty,omitzero"`
 
 	// URL to track this shipment (required if type != processing).
-	TrackingURL *string `json:"tracking_url,omitempty"`
+	TrackingURL *string `json:"tracking_url,omitempty,omitzero"`
 
 	// Fulfillment event type. Common values include: processing (preparing to ship),
 	// shipped (handed to carrier), in_transit (in delivery network), delivered
@@ -500,20 +747,18 @@ type FulfillmentEventLineItemsElem struct {
 	// Line item ID reference.
 	ID string `json:"id"`
 
-	// Quantity fulfilled in this event.
+	// Integer count of steps of the referenced line item's `quantity_unit`
+	// (`10^-scale` × `unit`); when `quantity_unit` is absent, it counts whole items
+	// (`each`).
 	Quantity int `json:"quantity"`
 }
 
-// A merchant-generated package/group of line items with fulfillment options.
-type FulfillmentGroupCreateRequest struct {
-	// ID of the selected fulfillment option for this group.
-	SelectedOptionID *string `json:"selected_option_id,omitempty"`
-
-	AdditionalProperties interface{} `mapstructure:",remain"`
-}
+// Extends Catalog with fulfillment discovery and Checkout with hierarchical
+// fulfillment.
+type FulfillmentExtension interface{}
 
 // A merchant-generated package/group of line items with fulfillment options.
-type FulfillmentGroupResponse struct {
+type FulfillmentGroup struct {
 	// Group identifier for referencing merchant-generated groups in updates.
 	ID string `json:"id"`
 
@@ -521,215 +766,189 @@ type FulfillmentGroupResponse struct {
 	LineItemIds []string `json:"line_item_ids"`
 
 	// Available fulfillment options for this group.
-	Options []FulfillmentOptionResponse `json:"options,omitempty"`
+	Options []FulfillmentOption `json:"options,omitempty,omitzero"`
 
 	// ID of the selected fulfillment option for this group.
-	SelectedOptionID *string `json:"selected_option_id,omitempty"`
+	SelectedOptionID FulfillmentGroupSelectedOptionID `json:"selected_option_id,omitempty,omitzero"`
 
 	AdditionalProperties interface{} `mapstructure:",remain"`
 }
 
-// A merchant-generated package/group of line items with fulfillment options.
-type FulfillmentGroupUpdateRequest struct {
-	// Group identifier for referencing merchant-generated groups in updates.
-	ID string `json:"id"`
+// ID of the selected fulfillment option for this group.
+type FulfillmentGroupSelectedOptionID *string
 
-	// ID of the selected fulfillment option for this group.
-	SelectedOptionID *string `json:"selected_option_id,omitempty"`
+// A fulfillment method with destinations and groups.
+type FulfillmentMethod interface{}
 
-	AdditionalProperties interface{} `mapstructure:",remain"`
-}
-
-// A fulfillment method (shipping or pickup) with destinations and groups.
-type FulfillmentMethodCreateRequest struct {
-	// Available destinations. For shipping: addresses. For pickup: retail locations.
-	Destinations []map[string]interface{} `json:"destinations,omitempty"`
-
-	// Fulfillment groups for selecting options. Agent sets selected_option_id on
-	// groups to choose shipping method.
-	Groups []FulfillmentGroupCreateRequest `json:"groups,omitempty"`
-
-	// Line item IDs fulfilled via this method.
-	LineItemIds []string `json:"line_item_ids,omitempty"`
-
-	// ID of the selected destination.
-	SelectedDestinationID *string `json:"selected_destination_id,omitempty"`
-
-	// Fulfillment method type.
-	Type FulfillmentMethodCreateRequestType `json:"type"`
-
-	AdditionalProperties interface{} `mapstructure:",remain"`
-}
-
-type FulfillmentMethodCreateRequestType string
-
-const FulfillmentMethodCreateRequestTypePickup FulfillmentMethodCreateRequestType = "pickup"
-const FulfillmentMethodCreateRequestTypeShipping FulfillmentMethodCreateRequestType = "shipping"
-
-// A fulfillment method (shipping or pickup) with destinations and groups.
-type FulfillmentMethodResponse struct {
-	// Available destinations. For shipping: addresses. For pickup: retail locations.
-	Destinations []map[string]interface{} `json:"destinations,omitempty"`
-
-	// Fulfillment groups for selecting options. Agent sets selected_option_id on
-	// groups to choose shipping method.
-	Groups []FulfillmentGroupResponse `json:"groups,omitempty"`
-
-	// Unique fulfillment method identifier.
-	ID string `json:"id"`
-
-	// Line item IDs fulfilled via this method.
-	LineItemIds []string `json:"line_item_ids"`
-
-	// ID of the selected destination.
-	SelectedDestinationID *string `json:"selected_destination_id,omitempty"`
-
-	// Fulfillment method type.
-	Type FulfillmentMethodResponseType `json:"type"`
-
-	AdditionalProperties interface{} `mapstructure:",remain"`
-}
-
-type FulfillmentMethodResponseType string
-
-const FulfillmentMethodResponseTypePickup FulfillmentMethodResponseType = "pickup"
-const FulfillmentMethodResponseTypeShipping FulfillmentMethodResponseType = "shipping"
-
-// A fulfillment method (shipping or pickup) with destinations and groups.
-type FulfillmentMethodUpdateRequest struct {
-	// Available destinations. For shipping: addresses. For pickup: retail locations.
-	Destinations []map[string]interface{} `json:"destinations,omitempty"`
-
-	// Fulfillment groups for selecting options. Agent sets selected_option_id on
-	// groups to choose shipping method.
-	Groups []FulfillmentGroupUpdateRequest `json:"groups,omitempty"`
-
-	// Unique fulfillment method identifier.
-	ID string `json:"id"`
-
-	// Line item IDs fulfilled via this method.
-	LineItemIds []string `json:"line_item_ids"`
-
-	// ID of the selected destination.
-	SelectedDestinationID *string `json:"selected_destination_id,omitempty"`
-
-	AdditionalProperties interface{} `mapstructure:",remain"`
-}
+// ID of the selected destination. Accepts any stable, Business-scoped ID the
+// Business recognizes for this method, including Location IDs not yet enumerated
+// in `destinations`.
+type FulfillmentMethodSelectedDestinationID *string
 
 // A fulfillment option within a group (e.g., Standard Shipping $5, Express $15).
-type FulfillmentOptionResponse struct {
+// Extends the fulfillment option base with cost and timing.
+type FulfillmentOption struct {
 	// Carrier name (for shipping).
-	Carrier *string `json:"carrier,omitempty"`
+	Carrier *string `json:"carrier,omitempty,omitzero"`
 
-	// Complete context for buyer decision (e.g., 'Arrives Dec 12-15 via FedEx').
-	Description *string `json:"description,omitempty"`
+	// Supplementary context for the title (e.g. 'Arrives in 4 business days',
+	// 'Arrives Dec 12-15 via FedEx'). Directly renderable; MUST NOT repeat the title.
+	Description *Description `json:"description,omitempty,omitzero"`
 
 	// Earliest fulfillment date.
-	EarliestFulfillmentTime *time.Time `json:"earliest_fulfillment_time,omitempty"`
+	EarliestFulfillmentTime *time.Time `json:"earliest_fulfillment_time,omitempty,omitzero"`
 
-	// Unique fulfillment option identifier.
+	// Unique identifier for this fulfillment option.
 	ID string `json:"id"`
 
 	// Latest fulfillment date.
-	LatestFulfillmentTime *time.Time `json:"latest_fulfillment_time,omitempty"`
+	LatestFulfillmentTime *time.Time `json:"latest_fulfillment_time,omitempty,omitzero"`
 
-	// Short label (e.g., 'Express Shipping', 'Curbside Pickup').
+	// Short label that distinguishes this option from its siblings (e.g. 'Standard',
+	// 'Express Shipping', 'Curbside Pickup').
 	Title string `json:"title"`
 
 	// Fulfillment option totals breakdown.
-	Totals []TotalResponse `json:"totals"`
+	Totals []Total `json:"totals"`
 
 	AdditionalProperties interface{} `mapstructure:",remain"`
 }
 
-// Container for fulfillment methods and availability.
-type FulfillmentRequest struct {
-	// Fulfillment methods for cart items.
-	Methods []FulfillmentMethodCreateRequest `json:"methods,omitempty"`
-}
+// Common base for a fulfillment option: an addressable, renderable choice (e.g.
+// Standard, Express). Catalog uses this base directly; checkout composes it with
+// cost and timing.
+type FulfillmentOptionBase struct {
+	// Supplementary context for the title (e.g. 'Arrives in 4 business days',
+	// 'Arrives Dec 12-15 via FedEx'). Directly renderable; MUST NOT repeat the title.
+	Description *Description `json:"description,omitempty,omitzero"`
 
-// Container for fulfillment methods and availability.
-type FulfillmentResponse struct {
-	// Inventory availability hints.
-	AvailableMethods []FulfillmentAvailableMethodResponse `json:"available_methods,omitempty"`
-
-	// Fulfillment methods for cart items.
-	Methods []FulfillmentMethodResponse `json:"methods,omitempty"`
-}
-
-type ItemCreateRequest struct {
-	// Should be recognized by both the Platform, and the Business. For Google it
-	// should match the id provided in the "id" field in the product feed.
+	// Unique identifier for this fulfillment option.
 	ID string `json:"id"`
+
+	// Short label that distinguishes this option from its siblings (e.g. 'Standard',
+	// 'Express Shipping', 'Curbside Pickup').
+	Title string `json:"title"`
+
+	AdditionalProperties interface{} `mapstructure:",remain"`
 }
 
-type ItemResponse struct {
-	// Should be recognized by both the Platform, and the Business. For Google it
-	// should match the id provided in the "id" field in the product feed.
+// WGS 84 geographic coordinates in decimal degrees.
+type Geo struct {
+	// WGS 84 latitude in decimal degrees.
+	Latitude float64 `json:"latitude"`
+
+	// WGS 84 longitude in decimal degrees.
+	Longitude float64 `json:"longitude"`
+}
+
+// Capability schema for identity linking. Businesses declare the
+// user-authenticated scopes they offer in a flat 'scopes' map. Each key is the
+// OAuth scope string as it appears on the wire ('{capability}:{scope}', e.g.
+// 'dev.ucp.shopping.order:read'). Scope presence implies that the corresponding
+// operations require user authentication. Operations not gated by any listed scope
+// operate at whatever access level the business permits; UCP does not prescribe a
+// default.
+type IdentityLinking interface{}
+
+// Info code identifying the type of informational message. Standard codes are
+// defined in capability specifications (see examples) and have standardized
+// semantics; freeform codes are permitted.
+type InfoCode string
+
+// Maps a request identifier to the variant it resolved to, with match semantics.
+type InputCorrelation struct {
+	// The identifier from the lookup request that resolved to this variant.
+	ID string `json:"id"`
+
+	// How the request identifier resolved to this variant. Well-known values: `exact`
+	// (input directly identifies this variant, e.g., variant ID, SKU), `featured`
+	// (server selected this variant as representative, e.g., product ID resolved to
+	// best match). Businesses MAY implement and provide additional resolution
+	// strategies.
+	Match *string `json:"match,omitempty,omitzero"`
+}
+
+// A constraint within an allowed combination that defines which instrument types
+// can fill this group and how many are permitted.
+type InstrumentGroup struct {
+	// Maximum number of instruments allowed from this group. Defaults to 1. MUST be
+	// greater than or equal to `min`.
+	Max int `json:"max,omitempty,omitzero"`
+
+	// Minimum number of instruments required from this group. Defaults to 0
+	// (optional).
+	Min int `json:"min,omitempty,omitzero"`
+
+	// Instrument types accepted by this group (OR logic). Any listed type qualifies.
+	Types []string `json:"types"`
+}
+
+type Item struct {
+	// The product identifier, often the SKU, required to resolve the product details
+	// associated with this line item. Should be recognized by both the Platform, and
+	// the Business.
 	ID string `json:"id"`
 
 	// Product image URI.
-	ImageURL *string `json:"image_url,omitempty"`
+	ImageURL *string `json:"image_url,omitempty,omitzero"`
 
-	// Unit price in minor (cents) currency units.
-	Price int `json:"price"`
+	// Unit price in ISO 4217 minor units. Price is the amount per one whole
+	// `quantity_unit.unit` (for example, per lb or per hour); when `quantity_unit` is
+	// absent, it is per `each`.
+	Price Amount `json:"price"`
+
+	// Sale basis this item's `quantity` is denominated in. On an authoritative
+	// Business response, absence encodes the default `each` machine identity (`C62`,
+	// 0); the Business MUST include this descriptor for every non-`each` response. On
+	// Platform requests, omission makes no assertion: the Business interprets
+	// `quantity` using the item's authoritative sale basis. If the Platform includes
+	// this descriptor, it asserts the unit-descriptor machine identity. The Business
+	// MUST compare that machine identity (`unit`, effective `scale`), ignore
+	// `display_text` and `increment`, and resolve a mismatch by conversion surfaced
+	// as a visible line revision with a warning, or by rejection with a recoverable
+	// business outcome; silent reinterpretation is forbidden. An explicit `C62`
+	// descriptor at effective scale 0 matches an authoritative basis represented by
+	// an absent descriptor.
+	QuantityUnit QuantityUnit `json:"quantity_unit,omitempty,omitzero"`
 
 	// Product title.
 	Title string `json:"title"`
-}
 
-type ItemUpdateRequest struct {
-	// Should be recognized by both the Platform, and the Business. For Google it
-	// should match the id provided in the "id" field in the product feed.
-	ID string `json:"id"`
-}
-
-// Line item object. Expected to use the currency of the parent object.
-type LineItemCreateRequest struct {
-	// Item corresponds to the JSON schema field "item".
-	Item ItemCreateRequest `json:"item"`
-
-	// Quantity of the item being purchased.
-	Quantity int `json:"quantity"`
+	// Pricing basis for this item. On an authoritative Business response, the
+	// Business MUST include `unit_price` on every line whose pricing basis differs
+	// from its sale basis (for example, priced per pound but sold per `each`);
+	// presence on a line marks the rate as transactional rather than display-only.
+	// When the pricing basis is the sale basis, `item.price` fully denominates the
+	// charge and this field MAY be omitted.
+	UnitPrice *UnitPrice `json:"unit_price,omitempty,omitzero"`
 }
 
 // Line item object. Expected to use the currency of the parent object.
-type LineItemResponse struct {
+type LineItem struct {
 	// ID corresponds to the JSON schema field "id".
 	ID string `json:"id"`
 
 	// Item corresponds to the JSON schema field "item".
-	Item ItemResponse `json:"item"`
+	Item Item `json:"item"`
 
 	// Parent line item identifier for any nested structures.
-	ParentID *string `json:"parent_id,omitempty"`
+	ParentID *string `json:"parent_id,omitempty,omitzero"`
 
-	// Quantity of the item being purchased.
+	// Always an integer step count. On Platform requests, steps use the item's
+	// Business-authoritative sale basis; omitting `item.quantity_unit` makes no
+	// assertion and does not imply `each`. On Business responses,
+	// `item.quantity_unit` describes the basis; if absent, it encodes the `each`
+	// machine identity (`C62`, 0) and `quantity` counts whole items.
 	Quantity int `json:"quantity"`
 
 	// Line item totals breakdown.
-	Totals []TotalResponse `json:"totals"`
-}
-
-// Line item object. Expected to use the currency of the parent object.
-type LineItemUpdateRequest struct {
-	// ID corresponds to the JSON schema field "id".
-	ID *string `json:"id,omitempty"`
-
-	// Item corresponds to the JSON schema field "item".
-	Item ItemUpdateRequest `json:"item"`
-
-	// Parent line item identifier for any nested structures.
-	ParentID *string `json:"parent_id,omitempty"`
-
-	// Quantity of the item being purchased.
-	Quantity int `json:"quantity"`
+	Totals []Total `json:"totals"`
 }
 
 type Link struct {
 	// Optional display text for the link. When provided, use this instead of
 	// generating from type.
-	Title *string `json:"title,omitempty"`
+	Title *string `json:"title,omitempty,omitzero"`
 
 	// Type of link. Well-known values: `privacy_policy`, `terms_of_service`,
 	// `refund_policy`, `shipping_policy`, `faq`. Consumers SHOULD handle unknown
@@ -741,56 +960,241 @@ type Link struct {
 	URL string `json:"url"`
 }
 
-// JWS Detached Content signature (RFC 7515 Appendix F) over the checkout response
-// body (excluding ap2 field). Format: `<base64url-header>..<base64url-signature>`.
-// The header MUST contain 'alg' (ES256/ES384/ES512) and 'kid' claims. The
-// signature covers both the header and JCS-canonicalized checkout payload.
-type MerchantAuthorization string
+// A coarse geographic location — country, region, and postal code. A lightweight
+// alternative to a full postal address.
+type Locality struct {
+	// The country, as a 2-letter ISO 3166-1 alpha-2 code (e.g. "US"). A 3-letter
+	// alpha-3 code or full country name MAY also be used.
+	AddressCountry *string `json:"address_country,omitempty,omitzero"`
 
-// Merchant's fulfillment configuration.
-type MerchantFulfillmentConfig struct {
-	// Allowed method type combinations.
-	AllowsMethodCombinations [][]MerchantFulfillmentConfigAllowsMethodCombinationsElemElem `json:"allows_method_combinations,omitempty"`
+	// The first-level administrative region within the country (e.g. a state or
+	// province such as California).
+	AddressRegion *string `json:"address_region,omitempty,omitzero"`
 
-	// Permits multiple destinations per method type.
-	AllowsMultiDestination *MerchantFulfillmentConfigAllowsMultiDestination `json:"allows_multi_destination,omitempty"`
+	// The postal code (e.g. "94043").
+	PostalCode *string `json:"postal_code,omitempty,omitzero"`
+
+	AdditionalProperties interface{} `mapstructure:",remain"`
 }
 
-type MerchantFulfillmentConfigAllowsMethodCombinationsElemElem string
+// The full, rich representation of a physical business location. Builds on the
+// Location Summary schema with discovery-centric details such as geographic
+// coordinates, operating hours, timezone, and amenities.
+type Location struct {
+	// Physical address of the location.
+	Address *PostalAddress `json:"address,omitempty,omitzero"`
 
-const MerchantFulfillmentConfigAllowsMethodCombinationsElemElemPickup MerchantFulfillmentConfigAllowsMethodCombinationsElemElem = "pickup"
-const MerchantFulfillmentConfigAllowsMethodCombinationsElemElemShipping MerchantFulfillmentConfigAllowsMethodCombinationsElemElem = "shipping"
+	// Static features, services, or capabilities of the Location, keyed by
+	// reverse-domain amenity identifier. Each value provides a buyer-facing
+	// description; the key alone defines amenity identity and filter matching.
+	Amenities LocationAmenities `json:"amenities,omitempty,omitzero"`
 
-// Permits multiple destinations per method type.
-type MerchantFulfillmentConfigAllowsMultiDestination struct {
-	// Multiple pickup locations allowed.
-	Pickup *bool `json:"pickup,omitempty"`
+	// Date-specific operating-hour exceptions, including full closures, whose date
+	// and time values use this Location's canonical local civil-time frame.
+	ExceptionHours []ExceptionHour `json:"exception_hours,omitempty,omitzero"`
 
-	// Multiple shipping destinations allowed.
-	Shipping *bool `json:"shipping,omitempty"`
+	// Geographic coordinates for the location.
+	Geo *Geo `json:"geo,omitempty,omitzero"`
+
+	// Regular weekly operating hours whose day and time values use this Location's
+	// canonical local civil-time frame. Multiple entries for the same day support
+	// split shifts. An omitted day has no regular interval beginning that day; an
+	// interval beginning on the preceding day can carry into it. Omission of the
+	// entire `hours` property means the regular schedule is unknown.
+	Hours []DailyHour `json:"hours,omitempty,omitzero"`
+
+	// Stable, opaque, Business-scoped Location identifier.
+	ID string `json:"id"`
+
+	// Buyer-facing, Business-owned display name.
+	Name string `json:"name"`
+
+	// The Business-owned IANA Time Zone Database identifier (e.g.,
+	// 'America/New_York') defining this Location's canonical local civil-time frame
+	// for all returned schedule day, time, and date fields. The Business does not
+	// vary this canonical framing by the requesting Platform's or Buyer's timezone.
+	// Required when hours or exception_hours is present.
+	Timezone *string `json:"timezone,omitempty,omitzero"`
+
+	AdditionalProperties interface{} `mapstructure:",remain"`
 }
+
+// Static features, services, or capabilities of the Location, keyed by
+// reverse-domain amenity identifier. Each value provides a buyer-facing
+// description; the key alone defines amenity identity and filter matching.
+type LocationAmenities map[string]Amenity
+
+// An explicit-center inclusive-radius predicate. The Business compares the
+// unrounded shortest WGS 84 ellipsoidal geodesic distance in RFC 7035 distance
+// unit (meters) from `center` to the Location's authoritative `geo`; a value less
+// than or equal to `max` matches. Implementations MAY use any algorithm that
+// produces the WGS 84 inverse-geodesic result at sufficient precision such that
+// the match outcome agrees with this unrounded comparison. No context, signals,
+// IP, or `serves` fallback, radius clamping, tolerance, or operand substitution is
+// permitted.
+type LocationDistance struct {
+	// Explicit center of the radius. The Platform MUST supply it; the Business MUST
+	// NOT derive it from context, signals, an IP address, or `serves`.
+	Center Geo `json:"center"`
+
+	// Inclusive maximum distance in RFC 7035 distance unit (meters). A Business
+	// unable to honor the supplied value MUST reject the request rather than clamp it
+	// or substitute another radius.
+	Max float64 `json:"max"`
+
+	AdditionalProperties interface{} `mapstructure:",remain"`
+}
+
+// Filter criteria to narrow Location Search and Lookup results. All supplied
+// filters combine with AND.
+type LocationFilter struct {
+	// Filter by amenity identifier. A Location matches only when its `amenities` map
+	// contains every supplied identifier as an exact key; descriptions and namespace
+	// prefixes do not participate in matching.
+	Amenities []ReverseDomainName `json:"amenities,omitempty,omitzero"`
+
+	// Filter by operating hours, evaluated at the one supplied instant.
+	Hours *LocationFilterHours `json:"hours,omitempty,omitzero"`
+
+	// Current item-availability filter. A candidate Location matches only when the
+	// Business can currently provide every referenced item at that Location; all
+	// references combine with AND.
+	Items []string `json:"items,omitempty,omitzero"`
+
+	AdditionalProperties interface{} `mapstructure:",remain"`
+}
+
+// Filter by operating hours, evaluated at the one supplied instant.
+type LocationFilterHours struct {
+	// The RFC 3339 instant at which matching Locations must be open, expressed with
+	// `Z` or a numeric offset. The Platform selects the instant that represents the
+	// Buyer's intent. The Business evaluates it exactly as supplied using each
+	// Location's authoritative `timezone`; the supplied offset does not identify that
+	// timezone.
+	OpenAt time.Time `json:"open_at"`
+}
+
+// Location lookup by identifiers. Supports batch retrieval and single-location
+// detail.
+type LocationLookup map[string]interface{}
+
+// Location search capability. Supports natural language queries, distance and
+// serviceability relations, structured filtering including current item
+// availability, and pagination.
+type LocationSearch map[string]interface{}
+
+// A one-entry map whose key names the authoritative service-target representation.
+// The Platform MUST supply exactly one target form. A Business that cannot
+// evaluate a well-formed target, or receives an extension form that was not
+// negotiated, MUST reject the request rather than ignore it, fall back, or broaden
+// results. This dictionary-like representation map cannot host an ambient `ucp`
+// member.
+type LocationServes struct {
+	// Coarse locality of the service target.
+	Address *LocationServesAddress `json:"address,omitempty,omitzero"`
+
+	// WGS 84 coordinates of the service target.
+	Point *Geo `json:"point,omitempty,omitzero"`
+
+	AdditionalProperties interface{} `mapstructure:",remain"`
+}
+
+// Coarse locality of the service target.
+type LocationServesAddress struct {
+	// The country, as a 2-letter ISO 3166-1 alpha-2 code (e.g. "US"). A 3-letter
+	// alpha-3 code or full country name MAY also be used.
+	AddressCountry *string `json:"address_country,omitempty,omitzero"`
+
+	// The first-level administrative region within the country (e.g. a state or
+	// province such as California).
+	AddressRegion *string `json:"address_region,omitempty,omitzero"`
+
+	// The postal code (e.g. "94043").
+	PostalCode *string `json:"postal_code,omitempty,omitzero"`
+
+	AdditionalProperties interface{} `mapstructure:",remain"`
+}
+
+type LocationServesAddress_0 struct {
+	// AddressCountry corresponds to the JSON schema field "address_country".
+	AddressCountry string `json:"address_country"`
+}
+
+type LocationServesAddress_1 struct {
+	// AddressRegion corresponds to the JSON schema field "address_region".
+	AddressRegion string `json:"address_region"`
+}
+
+type LocationServesAddress_2 struct {
+	// PostalCode corresponds to the JSON schema field "postal_code".
+	PostalCode string `json:"postal_code"`
+}
+
+// A summary of a physical business location.
+type LocationSummary struct {
+	// Physical address of the location.
+	Address *PostalAddress `json:"address,omitempty,omitzero"`
+
+	// Stable, opaque, Business-scoped Location identifier.
+	ID string `json:"id"`
+
+	// Buyer-facing, Business-owned display name.
+	Name string `json:"name"`
+
+	AdditionalProperties interface{} `mapstructure:",remain"`
+}
+
+// Extends various Capabilities with loyalty support using memberships info.
+type LoyaltyExtension interface{}
+
+// A measure composed of an integer value and a unit descriptor. Its value is the
+// integer count of `10^-scale` units of `unit`.
+type Measure interface{}
+
+// Media item (image, video, etc.).
+type Media struct {
+	// Accessibility text describing the media.
+	AltText *string `json:"alt_text,omitempty,omitzero"`
+
+	// Height in pixels (for images/video).
+	Height *int `json:"height,omitempty,omitzero"`
+
+	// Media type. Well-known values: `image`, `video`, `model_3d`.
+	Type string `json:"type"`
+
+	// URL to the media resource.
+	URL string `json:"url"`
+
+	// Width in pixels (for images/video).
+	Width *int `json:"width,omitempty,omitzero"`
+}
+
+// Container for error, warning, or info messages.
+type Message map[string]interface{}
 
 type MessageError struct {
-	// Error code. Possible values include: missing, invalid, out_of_stock,
-	// payment_declined, requires_sign_in, requires_3ds, requires_identity_linking.
-	// Freeform codes also allowed.
-	Code string `json:"code"`
+	// Code corresponds to the JSON schema field "code".
+	Code ErrorCode `json:"code"`
 
 	// Human-readable message.
 	Content string `json:"content"`
 
 	// Content format, default = plain.
-	ContentType MessageErrorContentType `json:"content_type,omitempty"`
+	ContentType MessageErrorContentType `json:"content_type,omitempty,omitzero"`
 
-	// RFC 9535 JSONPath to the component the message refers to (e.g., $.items[1]).
-	Path *string `json:"path,omitempty"`
+	// RFC 9535 JSONPath to the component the message refers to (e.g.,
+	// $.line_items[0]).
+	Path *string `json:"path,omitempty,omitzero"`
 
-	// Declares who resolves this error. 'recoverable': agent can fix via API.
-	// 'requires_buyer_input': merchant requires information their API doesn't support
-	// collecting programmatically (checkout incomplete). 'requires_buyer_review':
-	// buyer must authorize before order placement due to policy, regulatory, or
-	// entitlement rules (checkout complete). Errors with 'requires_*' severity
-	// contribute to 'status: requires_escalation'.
+	// Reflects the resource state and recommended action. 'recoverable': platform can
+	// resolve the condition in band, for example by modifying inputs or processing a
+	// related Action, and submit a new operation when needed. 'requires_buyer_input':
+	// merchant requires information their API doesn't support collecting
+	// programmatically (checkout incomplete). 'requires_buyer_review': buyer must
+	// authorize before order placement due to policy, regulatory, or entitlement
+	// rules. 'unrecoverable': no valid resource exists to act on, retry with new
+	// resource or inputs. Errors with 'requires_*' severity contribute to 'status:
+	// requires_escalation'.
 	Severity MessageErrorSeverity `json:"severity"`
 
 	// Message type discriminator.
@@ -807,19 +1211,21 @@ type MessageErrorSeverity string
 const MessageErrorSeverityRecoverable MessageErrorSeverity = "recoverable"
 const MessageErrorSeverityRequiresBuyerInput MessageErrorSeverity = "requires_buyer_input"
 const MessageErrorSeverityRequiresBuyerReview MessageErrorSeverity = "requires_buyer_review"
+const MessageErrorSeverityUnrecoverable MessageErrorSeverity = "unrecoverable"
 
 type MessageInfo struct {
-	// Info code for programmatic handling.
-	Code *string `json:"code,omitempty"`
+	// Code corresponds to the JSON schema field "code".
+	Code *InfoCode `json:"code,omitempty,omitzero"`
 
 	// Human-readable message.
 	Content string `json:"content"`
 
 	// Content format, default = plain.
-	ContentType MessageInfoContentType `json:"content_type,omitempty"`
+	ContentType MessageInfoContentType `json:"content_type,omitempty,omitzero"`
 
-	// RFC 9535 JSONPath to the component the message refers to.
-	Path *string `json:"path,omitempty"`
+	// RFC 9535 JSONPath to the component the message refers to (e.g.,
+	// $.line_items[0]).
+	Path *string `json:"path,omitempty,omitzero"`
 
 	// Message type discriminator.
 	Type string `json:"type"`
@@ -831,21 +1237,34 @@ const MessageInfoContentTypeMarkdown MessageInfoContentType = "markdown"
 const MessageInfoContentTypePlain MessageInfoContentType = "plain"
 
 type MessageWarning struct {
-	// Warning code. Machine-readable identifier for the warning type (e.g.,
-	// final_sale, prop65, fulfillment_changed, age_restricted, etc.).
-	Code string `json:"code"`
+	// Code corresponds to the JSON schema field "code".
+	Code WarningCode `json:"code"`
 
 	// Human-readable warning message that MUST be displayed.
 	Content string `json:"content"`
 
 	// Content format, default = plain.
-	ContentType MessageWarningContentType `json:"content_type,omitempty"`
+	ContentType MessageWarningContentType `json:"content_type,omitempty,omitzero"`
 
-	// JSONPath (RFC 9535) to related field (e.g., $.line_items[0]).
-	Path *string `json:"path,omitempty"`
+	// URL to a required visual element (e.g., warning symbol, energy class label).
+	ImageURL *string `json:"image_url,omitempty,omitzero"`
+
+	// RFC 9535 JSONPath to the component the message refers to (e.g.,
+	// $.line_items[0]).
+	Path *string `json:"path,omitempty,omitzero"`
+
+	// Rendering contract for this warning. 'notice' (default): platform MUST display,
+	// MAY dismiss. 'disclosure': platform MUST display in proximity to the
+	// path-referenced component, MUST NOT hide or auto-dismiss. See specification for
+	// full contract.
+	Presentation string `json:"presentation,omitempty,omitzero"`
 
 	// Message type discriminator.
 	Type string `json:"type"`
+
+	// Reference URL for more information (e.g., regulatory site, registry entry,
+	// policy page).
+	URL *string `json:"url,omitempty,omitzero"`
 }
 
 type MessageWarningContentType string
@@ -853,15 +1272,38 @@ type MessageWarningContentType string
 const MessageWarningContentTypeMarkdown MessageWarningContentType = "markdown"
 const MessageWarningContentTypePlain MessageWarningContentType = "plain"
 
-// Order schema with immutable line items, buyer-facing fulfillment expectations,
-// and append-only event logs.
+// A card-network token credential verified with a transaction cryptogram. The
+// `number` field carries the network token or wallet-provisioned token rather than
+// the underlying FPAN.
+type NetworkTokenCredential interface{}
+
+// A selectable value for a product option.
+type OptionValue struct {
+	// Optional server-assigned identifier for this option value. When present in a
+	// selected_option, the server SHOULD use it for matching instead of label.
+	ID *string `json:"id,omitempty,omitzero"`
+
+	// Display text for this option value (e.g., 'Small', 'Blue').
+	Label string `json:"label"`
+}
+
+// Order schema with line items, buyer-facing fulfillment expectations, and event
+// logs.
 type Order struct {
-	// Append-only event log of money movements (refunds, returns, credits, disputes,
-	// cancellations, etc.) that exist independently of fulfillment.
-	Adjustments []Adjustment `json:"adjustments,omitempty"`
+	// Post-order events (refunds, returns, credits, disputes, cancellations, etc.)
+	// that exist independently of fulfillment.
+	Adjustments []Adjustment `json:"adjustments,omitempty,omitzero"`
+
+	// Snapshot of the attribution associated with the originating checkout. Read-only
+	// on the order.
+	Attribution Attribution `json:"attribution,omitempty,omitzero"`
 
 	// Associated checkout ID for reconciliation.
 	CheckoutID string `json:"checkout_id"`
+
+	// ISO 4217 currency code. MUST match the currency from the originating checkout
+	// session.
+	Currency string `json:"currency"`
 
 	// Fulfillment data: buyer expectations and what actually happened.
 	Fulfillment OrderFulfillment `json:"fulfillment"`
@@ -869,23 +1311,41 @@ type Order struct {
 	// Unique order identifier.
 	ID string `json:"id"`
 
-	// Immutable line items — source of truth for what was ordered.
+	// Human-readable label for identifying the order. MUST only be provided by the
+	// business.
+	Label *string `json:"label,omitempty,omitzero"`
+
+	// Line items representing what was purchased — can change post-order via edits or
+	// exchanges.
 	LineItems []OrderLineItem `json:"line_items"`
+
+	// Business outcome messages (errors, warnings, informational). Present when the
+	// business needs to communicate status or issues to the platform.
+	Messages []Message `json:"messages,omitempty,omitzero"`
 
 	// Permalink to access the order on merchant site.
 	PermalinkURL string `json:"permalink_url"`
 
+	// Snapshot of the policies that applied to the items at checkout, captured on the
+	// order as a durable record. `applies_to` targets are relative to the response
+	// root.
+	Policies []Policy `json:"policies,omitempty,omitzero"`
+
 	// Different totals for the order.
-	Totals []TotalResponse `json:"totals"`
+	Totals Totals `json:"totals"`
 
 	// Ucp corresponds to the JSON schema field "ucp".
-	Ucp ResponseOrder `json:"ucp"`
+	Ucp UcpOrderResponseSchema `json:"ucp"`
 }
 
 // Order details available at the time of checkout completion.
 type OrderConfirmation struct {
 	// Unique order identifier.
 	ID string `json:"id"`
+
+	// Human-readable label for identifying the order. MUST only be provided by the
+	// business.
+	Label *string `json:"label,omitempty,omitzero"`
 
 	// Permalink to access the order on merchant site.
 	PermalinkURL string `json:"permalink_url"`
@@ -895,40 +1355,51 @@ type OrderConfirmation struct {
 type OrderFulfillment struct {
 	// Append-only event log of actual shipments. Each event references line items by
 	// ID.
-	Events []FulfillmentEvent `json:"events,omitempty"`
+	Events []FulfillmentEvent `json:"events,omitempty,omitzero"`
 
 	// Buyer-facing groups representing when/how items will be delivered. Can be
 	// split, merged, or adjusted post-order.
-	Expectations []Expectation `json:"expectations,omitempty"`
+	Expectations []Expectation `json:"expectations,omitempty,omitzero"`
 }
 
 type OrderLineItem struct {
 	// Line item identifier.
 	ID string `json:"id"`
 
-	// Product data (id, title, price, image_url).
-	Item ItemResponse `json:"item"`
+	// Purchased item data, including identity, price, and sale basis.
+	Item Item `json:"item"`
 
 	// Parent line item identifier for any nested structures.
-	ParentID *string `json:"parent_id,omitempty"`
+	ParentID *string `json:"parent_id,omitempty,omitzero"`
 
-	// Quantity tracking. Both total and fulfilled are derived from events.
+	// Tracks the line item's original, current active, and fulfilled quantities. All
+	// three values use the same inherited `item.quantity_unit`. When
+	// `item.quantity_unit` is absent on an authoritative order response, each step is
+	// one whole item (`each`) under the shared default.
 	Quantity OrderLineItemQuantity `json:"quantity"`
 
-	// Derived status: fulfilled if quantity.fulfilled == quantity.total, partial if
+	// Derived status: removed if quantity.total == 0, fulfilled if quantity.total > 0
+	// and quantity.fulfilled == quantity.total, partial if quantity.total > 0 and
 	// quantity.fulfilled > 0, otherwise processing.
 	Status OrderLineItemStatus `json:"status"`
 
 	// Line item totals breakdown.
-	Totals []TotalResponse `json:"totals"`
+	Totals []Total `json:"totals"`
 }
 
-// Quantity tracking. Both total and fulfilled are derived from events.
+// Tracks the line item's original, current active, and fulfilled quantities. All
+// three values use the same inherited `item.quantity_unit`. When
+// `item.quantity_unit` is absent on an authoritative order response, each step is
+// one whole item (`each`) under the shared default.
 type OrderLineItemQuantity struct {
-	// Quantity fulfilled (sum from fulfillment events).
+	// Quantity fulfilled so far, expressed as an integer step count.
 	Fulfilled int `json:"fulfilled"`
 
-	// Current total quantity.
+	// Quantity from the original checkout, expressed as an integer step count.
+	Original *int `json:"original,omitempty,omitzero"`
+
+	// Current active quantity after returns, cancellations, or other order changes,
+	// expressed as an integer step count.
 	Total int `json:"total"`
 }
 
@@ -937,63 +1408,58 @@ type OrderLineItemStatus string
 const OrderLineItemStatusFulfilled OrderLineItemStatus = "fulfilled"
 const OrderLineItemStatusPartial OrderLineItemStatus = "partial"
 const OrderLineItemStatusProcessing OrderLineItemStatus = "processing"
+const OrderLineItemStatusRemoved OrderLineItemStatus = "removed"
 
-// Non-sensitive backend identifiers for linking.
-type PaymentAccountInfo struct {
-	// EMVCo PAR. A unique identifier linking a payment card to a specific account,
-	// enabling tracking across tokens (Apple Pay, physical card, etc).
-	PaymentAccountReference *string `json:"payment_account_reference,omitempty"`
-}
+// Cursor-based pagination for list operations.
+type Pagination map[string]interface{}
+
+// A card credential carrying a funding primary account number (FPAN). Credential
+// selection follows the shape of the value on the wire rather than its provenance:
+// a network token surfaced in PAN form and verified with a `cvc` - as with
+// credentials where a dynamic verification code proxies the cryptogram - is
+// carried here, while a token verified with a discrete `cryptogram` uses Network
+// Token Credential. This credential type MUST NOT be used for checkout, only with
+// payment handlers that tokenize or encrypt credentials. CRITICAL: Both parties
+// handling a PAN credential (sender and receiver) MUST be PCI DSS compliant.
+// Transmission MUST use HTTPS/TLS with strong cipher suites.
+type PanCredential interface{}
 
 // Payment configuration containing handlers.
-type PaymentCreateRequest struct {
+type Payment struct {
 	// The payment instruments available for this payment. Each instrument is
 	// associated with a specific handler via the handler_id field. Handlers can
 	// extend the base payment_instrument schema to add handler-specific fields.
-	Instruments []map[string]interface{} `json:"instruments,omitempty"`
-
-	// The id of the currently selected payment instrument from the instruments array.
-	// Set by the agent when submitting payment, and echoed back by the merchant in
-	// finalized state.
-	SelectedInstrumentID *string `json:"selected_instrument_id,omitempty"`
+	Instruments []SelectedPaymentInstrument `json:"instruments,omitempty,omitzero"`
 }
 
-// The data that will used to submit payment to the merchant.
-type PaymentData struct {
-	// PaymentData corresponds to the JSON schema field "payment_data".
-	PaymentData map[string]interface{} `json:"payment_data"`
+// Extends Checkout with cryptographic mandate support for non-repudiable
+// authorization per the AP2 protocol. Uses embedded signature model with ap2
+// namespace.
+type PaymentAp2MandateExtension interface{}
+
+// Extends capabilities (e.g., checkout in retail shopping) with standard device
+// data collection and 3DS challenge Action types used during payment
+// authentication.
+type PaymentAuthenticationExtension interface{}
+
+// The base definition for any payment credential. Handlers define specific
+// credential types.
+type PaymentCredential struct {
+	// The credential type discriminator. Specific schemas will constrain this to a
+	// constant value.
+	Type string `json:"type"`
+
+	AdditionalProperties interface{} `mapstructure:",remain"`
 }
 
-type PaymentHandlerResponse struct {
-	// A dictionary containing provider-specific configuration details, such as
-	// merchant IDs, supported networks, or gateway credentials.
-	Config map[string]interface{} `json:"config"`
+type PaymentHandlerBase interface{}
 
-	// A URI pointing to a JSON Schema used to validate the structure of the config
-	// object.
-	ConfigSchema string `json:"config_schema"`
-
-	// The unique identifier for this handler instance within the payment.handlers.
-	// Used by payment instruments to reference which handler produced them.
-	ID string `json:"id"`
-
-	// InstrumentSchemas corresponds to the JSON schema field "instrument_schemas".
-	InstrumentSchemas []string `json:"instrument_schemas"`
-
-	// The specification name using reverse-DNS format. For example,
-	// dev.ucp.delegate_payment.
-	Name string `json:"name"`
-
-	// A URI pointing to the technical specification or schema that defines how this
-	// handler operates.
-	Spec string `json:"spec"`
-
-	// Handler version in YYYY-MM-DD format.
-	Version Version `json:"version"`
-}
+// Handler reference in responses. May include full config state for runtime usage
+// of the handler.
+type PaymentHandlerResponseSchema interface{}
 
 // Identity of a participant for token binding. The access_token uniquely
-// identifies the participant who tokens should be bound to.
+// identifies the participant whom tokens should be issued to.
 type PaymentIdentity struct {
 	// Unique identifier for this participant, obtained during onboarding with the
 	// tokenizer.
@@ -1001,355 +1467,691 @@ type PaymentIdentity struct {
 }
 
 // The base definition for any payment instrument. It links the instrument to a
-// specific Merchant configuration (handler_id) and defines common fields like
-// billing address.
-type PaymentInstrumentBase struct {
+// specific payment handler.
+type PaymentInstrument struct {
 	// The billing address associated with this payment method.
-	BillingAddress *PostalAddress `json:"billing_address,omitempty"`
+	BillingAddress *PostalAddress `json:"billing_address,omitempty,omitzero"`
 
 	// Credential corresponds to the JSON schema field "credential".
-	Credential map[string]interface{} `json:"credential,omitempty"`
+	Credential *PaymentCredential `json:"credential,omitempty,omitzero"`
+
+	// Display information for this payment instrument. Each payment instrument schema
+	// defines its specific display properties, as outlined by the payment handler.
+	Display PaymentInstrumentDisplay `json:"display,omitempty,omitzero"`
 
 	// The unique identifier for the handler instance that produced this instrument.
 	// This corresponds to the 'id' field in the Payment Handler definition.
 	HandlerID string `json:"handler_id"`
 
-	// A unique identifier for this instrument instance, assigned by the Agent. Used
-	// to reference this specific instrument in the 'payment.selected_instrument_id'
-	// field.
+	// A unique identifier for this instrument instance. Typically assigned by the
+	// platform for instruments it collects. For a business-owned saved instrument
+	// returned on an identity-linked response, this identifier is assigned by the
+	// business; the platform MUST treat it as an opaque, business-scoped reference,
+	// and the business resolves it server-side when the buyer selects it.
 	ID string `json:"id"`
 
 	// The broad category of the instrument (e.g., 'card', 'tokenized_card'). Specific
 	// schemas will constrain this to a constant value.
 	Type string `json:"type"`
+
+	AdditionalProperties interface{} `mapstructure:",remain"`
 }
 
-// Payment configuration containing handlers.
-type PaymentResponse struct {
-	// Processing configurations that define how payment instruments can be collected.
-	// Each handler specifies a tokenization or payment collection strategy.
-	Handlers []PaymentHandlerResponse `json:"handlers"`
+// Display information for this payment instrument. Each payment instrument schema
+// defines its specific display properties, as outlined by the payment handler.
+type PaymentInstrumentDisplay map[string]interface{}
 
-	// The payment instruments available for this payment. Each instrument is
-	// associated with a specific handler via the handler_id field. Handlers can
-	// extend the base payment_instrument schema to add handler-specific fields.
-	Instruments []map[string]interface{} `json:"instruments,omitempty"`
+// A single payment that settles part or all of the checkout under a payment term.
+// Timing is stated in buyer-facing text; `type` and `due_at` are supplementary
+// machine-readable signals derived from it.
+type PaymentSchedule struct {
+	// The amount charged when this payment is taken, inclusive of tax and every other
+	// charge, in the Checkout currency's minor units (ISO 4217). A schedule states an
+	// amount rather than a totals breakdown: the purchase is priced once at the
+	// Checkout, and a schedule moves part or all of that price. Where the selected
+	// term changes what the purchase costs, that difference appears in
+	// `checkout.totals`, not here.
+	Amount Amount `json:"amount"`
 
-	// The id of the currently selected payment instrument from the instruments array.
-	// Set by the agent when submitting payment, and echoed back by the merchant in
-	// finalized state.
-	SelectedInstrumentID *string `json:"selected_instrument_id,omitempty"`
+	// Complete buyer-facing statement of when and how this payment is due. Businesses
+	// MUST make this field sufficient on its own: a Platform that recognizes no
+	// `type` value and reads no other field MUST be able to present this schedule
+	// correctly. Platforms MAY use `type` and `due_at` for enhanced presentation, but
+	// MUST NOT present derived timing that contradicts this field.
+	Description Description `json:"description"`
+
+	// Absolute RFC 3339 date-time when this payment is due, when the Business can
+	// determine one at checkout. Supplementary to `description`, never a replacement
+	// for it. Omitted when the due date depends on a future event (e.g. 'due on
+	// delivery'); the timing is then stated in `description` alone.
+	DueAt *time.Time `json:"due_at,omitempty,omitzero"`
+
+	// Identifier for this payment schedule, unique within its payment term.
+	// Businesses SHOULD keep it stable across responses while the schedule remains
+	// the same payment.
+	ID string `json:"id"`
+
+	// Timing class, drawn from an open vocabulary. `immediate` is the only value with
+	// defined meaning: the payment is due when the checkout is completed. Any other
+	// value means the payment is not due at completion, and `description` states when
+	// it is due. Whether a due payment is authorized, captured, or settled at that
+	// moment is payment-handler behavior and outside this extension. Businesses MAY
+	// use additional values (e.g. `deferred`, `on_shipment`); Platforms MUST treat
+	// unrecognized values as not due at completion.
+	Type string `json:"type"`
+
+	AdditionalProperties interface{} `mapstructure:",remain"`
 }
 
-// Payment configuration containing handlers.
-type PaymentUpdateRequest struct {
-	// The payment instruments available for this payment. Each instrument is
-	// associated with a specific handler via the handler_id field. Handlers can
-	// extend the base payment_instrument schema to add handler-specific fields.
-	Instruments []map[string]interface{} `json:"instruments,omitempty"`
+// Enables Buyers to use multiple payment instruments for a single session.
+type PaymentSplitPaymentsExtension interface{}
 
-	// The id of the currently selected payment instrument from the instruments array.
-	// Set by the agent when submitting payment, and echoed back by the merchant in
-	// finalized state.
-	SelectedInstrumentID *string `json:"selected_instrument_id,omitempty"`
+// A way of paying for the checkout: one or more payment schedules that together
+// cover its total.
+type PaymentTerm struct {
+	// Supplementary context for the title (e.g. 'Save 5% by paying today'). Directly
+	// renderable; MUST NOT repeat the title.
+	Description *Description `json:"description,omitempty,omitzero"`
+
+	// Unique identifier for this payment term within the checkout. Referenced by
+	// `payment.selected_term_id`.
+	ID string `json:"id"`
+
+	// Payment schedules that settle this checkout under this term, in the order they
+	// come due.
+	Schedules []PaymentSchedule `json:"schedules"`
+
+	// Short label that distinguishes this term from its siblings (e.g. 'Pay now',
+	// 'Pay in 4', 'Deposit + balance at check-in').
+	Title string `json:"title"`
+
+	AdditionalProperties interface{} `mapstructure:",remain"`
 }
 
-// Platform's order capability configuration.
-type PlatformConfig struct {
-	// URL where merchant sends order lifecycle events (webhooks).
-	WebhookURL string `json:"webhook_url"`
-}
+// Extends capabilities (e.g., checkout in retail shopping) with selectable payment
+// terms, letting a Business offer alternative schedules for when payment for the
+// checkout is due, and projects the accepted term onto the resulting Order.
+type PaymentTermsExtension interface{}
+
+// Browser-addressable shopping intent capability: defines a Business browser
+// endpoint and redirect resolution. It defines no shopping-state fields of its
+// own; permalink query parameters address existing UCP field paths.
+type PermalinkCapability interface{}
 
 // Platform's fulfillment configuration.
 type PlatformFulfillmentConfig struct {
 	// Enables multiple groups per method.
-	SupportsMultiGroup bool `json:"supports_multi_group,omitempty"`
+	SupportsMultiGroup bool `json:"supports_multi_group,omitempty,omitzero"`
+}
+
+// A durable business rule about the items in a response — return/refund terms,
+// warranty, and the like — at the time of purchase. Every policy carries a `type`
+// (an open reverse-DNS vocabulary) and a `description` so a platform can present
+// it without understanding its type-specific fields; type-specific fields (gated
+// by `type`) add structured context for platforms that model that type. Policies
+// are reference data; the obligation to display a term to the buyer is carried by
+// a `messages[]` warning whose `code` equals the policy `type` — see the Policies
+// section of the specification.
+type Policy struct {
+	// RFC 9535 JSONPath expressions identifying the nodes this policy applies to,
+	// relative to the embedding response root (e.g., `$.line_items[0]` in
+	// cart/checkout, `$.products[2]` in catalog). Each target covers the node it
+	// names and everything nested under it, so a target on a product also covers its
+	// variants. A singular query (RFC 9535 Section 2.3.5.1; name and index selectors
+	// only) names a single node; filters, wildcards, and slices match a set. When
+	// omitted, the policy applies to the entire response. When policies of the same
+	// `type` contest a node, the narrowest target wins and overrides the rest. See
+	// the Policies section for how specificity resolves.
+	AppliesTo []string `json:"applies_to,omitempty,omitzero"`
+
+	// Human-readable policy summary in one or more formats (plain, markdown, html).
+	// Required on every policy so a platform can present it without understanding any
+	// type-specific fields. This is not the buyer-facing disclosure — display is
+	// compelled by a `messages[]` warning (see the Policies section).
+	Description Description `json:"description"`
+
+	// Policy type discriminator. Open reverse-DNS vocabulary. Well-known values:
+	// `dev.ucp.shopping.policy.return` (return terms),
+	// `dev.ucp.shopping.policy.warranty` (warranty terms). Businesses MAY define
+	// custom types in their own domain (e.g., `com.example.policy.price_match`).
+	// Platforms MUST tolerate unknown values.
+	Type ReverseDomainName `json:"type"`
+
+	// Optional link to the full policy document.
+	URL *string `json:"url,omitempty,omitzero"`
+
+	AdditionalProperties interface{} `mapstructure:",remain"`
 }
 
 type PostalAddress struct {
 	// The country. Recommended to be in 2-letter ISO 3166-1 alpha-2 format, for
 	// example "US". For backward compatibility, a 3-letter ISO 3166-1 alpha-3 country
 	// code such as "SGP" or a full country name such as "Singapore" can also be used.
-	AddressCountry *string `json:"address_country,omitempty"`
+	AddressCountry *string `json:"address_country,omitempty,omitzero"`
 
 	// The locality in which the street address is, and which is in the region. For
 	// example, Mountain View.
-	AddressLocality *string `json:"address_locality,omitempty"`
+	AddressLocality *string `json:"address_locality,omitempty,omitzero"`
 
 	// The region in which the locality is, and which is in the country. Required for
 	// applicable countries (i.e. state in US, province in CA). For example,
 	// California or another appropriate first-level Administrative division.
-	AddressRegion *string `json:"address_region,omitempty"`
+	AddressRegion *string `json:"address_region,omitempty,omitzero"`
 
 	// An address extension such as an apartment number, C/O or alternative name.
-	ExtendedAddress *string `json:"extended_address,omitempty"`
+	ExtendedAddress *string `json:"extended_address,omitempty,omitzero"`
 
 	// Optional. First name of the contact associated with the address.
-	FirstName *string `json:"first_name,omitempty"`
-
-	// Optional. Full name of the contact associated with the address (if first_name
-	// or last_name fields are present they take precedence).
-	FullName *string `json:"full_name,omitempty"`
+	FirstName *string `json:"first_name,omitempty,omitzero"`
 
 	// Optional. Last name of the contact associated with the address.
-	LastName *string `json:"last_name,omitempty"`
+	LastName *string `json:"last_name,omitempty,omitzero"`
 
 	// Optional. Phone number of the contact associated with the address.
-	PhoneNumber *string `json:"phone_number,omitempty"`
+	PhoneNumber *string `json:"phone_number,omitempty,omitzero"`
 
 	// The postal code. For example, 94043.
-	PostalCode *string `json:"postal_code,omitempty"`
+	PostalCode *string `json:"postal_code,omitempty,omitzero"`
 
 	// The street address.
-	StreetAddress *string `json:"street_address,omitempty"`
+	StreetAddress *string `json:"street_address,omitempty,omitzero"`
 }
 
-// Capability reference in responses. Only name/version required to confirm active
-// capabilities.
-type Response interface{}
+// Price with explicit currency.
+type Price struct {
+	// Amount in ISO 4217 minor units. Use 0 for free items.
+	Amount Amount `json:"amount"`
+
+	// ISO 4217 currency code (e.g., 'USD', 'EUR', 'GBP').
+	Currency string `json:"currency"`
+}
+
+// Price range filter denominated in context.currency. When context.currency
+// matches the presentment currency, businesses apply the filter directly. When it
+// differs, businesses SHOULD convert filter values to the presentment currency
+// before applying; if conversion is not supported, businesses MAY ignore the
+// filter and SHOULD indicate this via a message. When context.currency is absent,
+// filter denomination is ambiguous and businesses MAY ignore it.
+type PriceFilter struct {
+	// Maximum price in ISO 4217 minor units.
+	Max *Amount `json:"max,omitempty,omitzero"`
+
+	// Minimum price in ISO 4217 minor units.
+	Min *Amount `json:"min,omitempty,omitzero"`
+}
+
+// A price range representing minimum and maximum values (e.g., a common example in
+// retail shopping is when prices vary across product variants).
+type PriceRange struct {
+	// Maximum price in the range.
+	Max Price `json:"max"`
+
+	// Minimum price in the range.
+	Min Price `json:"min"`
+}
+
+// A product in the catalog with variants and options.
+type Product struct {
+	// Product categories with optional taxonomy identifiers.
+	Categories []Category `json:"categories,omitempty,omitzero"`
+
+	// Product description in one or more formats.
+	Description Description `json:"description"`
+
+	// URL-safe slug for SEO-friendly URLs (e.g., 'blue-runner-pro'). Use id for
+	// stable API references.
+	Handle *string `json:"handle,omitempty,omitzero"`
+
+	// Global ID (GID) uniquely identifying this product.
+	ID string `json:"id"`
+
+	// List price range before discounts (for strikethrough display).
+	ListPriceRange *PriceRange `json:"list_price_range,omitempty,omitzero"`
+
+	// Product media (images, videos, 3D models). First item is the featured media for
+	// listings.
+	Media []Media `json:"media,omitempty,omitzero"`
+
+	// Business-defined custom data extending the standard product model.
+	Metadata ProductMetadata `json:"metadata,omitempty,omitzero"`
+
+	// Product options (Size, Color, etc.).
+	Options []ProductOption `json:"options,omitempty,omitzero"`
+
+	// Price range across all variants.
+	PriceRange PriceRange `json:"price_range"`
+
+	// Aggregate product rating.
+	Rating *Rating `json:"rating,omitempty,omitzero"`
+
+	// Product tags for categorization and search.
+	Tags []string `json:"tags,omitempty,omitzero"`
+
+	// Product title.
+	Title string `json:"title"`
+
+	// Canonical product page URL.
+	URL *string `json:"url,omitempty,omitzero"`
+
+	// Purchasable variants of this product. First item is the featured variant for
+	// listings.
+	Variants []Variant `json:"variants"`
+}
+
+// Business-defined custom data extending the standard product model.
+type ProductMetadata map[string]interface{}
+
+// A product option such as size, color, or material.
+type ProductOption struct {
+	// Option name (e.g., 'Size', 'Color').
+	Name string `json:"name"`
+
+	// Available values for this option.
+	Values []OptionValue `json:"values"`
+}
+
+// Sale-basis descriptor for quantities: the shared unit descriptor plus the
+// Business's ordering policy. Its unit-descriptor machine identity remains
+// (`unit`, effective `scale`); `display_text` and `increment` are excluded from
+// identity and mismatch comparison.
+type QuantityUnit interface{}
+
+// Product rating aggregate.
+type Rating struct {
+	// Number of reviews contributing to the rating.
+	Count *int `json:"count,omitempty,omitzero"`
+
+	// Maximum value on the rating scale (e.g., 5 for 5-star).
+	ScaleMax float64 `json:"scale_max"`
+
+	// Minimum value on the rating scale (e.g., 1 for 1-5 stars).
+	ScaleMin float64 `json:"scale_min,omitempty,omitzero"`
+
+	// Average rating value.
+	Value float64 `json:"value"`
+}
+
+// Binds the shared Constraint Expression grammar to data in the next UCP request
+// to the same resource.
+type RequestConstraints struct {
+	// Alternative Object Constraints. The constrained object must satisfy at least
+	// one. A branch must be non-empty: an empty branch is satisfied by every object
+	// and neutralizes the alternation.
+	AnyOf []ConstraintExpression `json:"anyOf,omitempty,omitzero"`
+
+	// A complete RFC 9535 JSONPath query evaluated against the next logical UCP
+	// request to the same resource.
+	Path *string `json:"path,omitempty,omitzero"`
+
+	// Constraints keyed by property name. Must be non-empty: an empty object applies
+	// no constraint.
+	Properties RequestConstraintsProperties `json:"properties,omitempty,omitzero"`
+
+	// Property names required by the constrained object. Must be non-empty: an empty
+	// array applies no constraint.
+	Required []string `json:"required,omitempty,omitzero"`
+}
+
+// Constraints keyed by property name. Must be non-empty: an empty object applies
+// no constraint.
+type RequestConstraintsProperties map[string]interface{}
+
+// Reverse-domain identifier used for collision-safe namespacing of capabilities,
+// services, handlers, eligibility claims, and extension-contributed keys. Must
+// contain at least two dot-separated segments (e.g., 'dev.ucp.shopping.checkout',
+// 'com.example.loyalty_gold'). Segments after the first are domain- or
+// identifier-derived: they may contain interior hyphens, may start with a digit,
+// and may contain underscores (e.g., 'com.example-shop.checkout',
+// 'com.2example.cart', 'dev.ucp.common.identity_linking'), but must not start or
+// end with a hyphen. The first segment (the reversed top-level domain) is letters
+// and digits, and may contain interior hyphens to support internationalized
+// (punycode) top-level domains such as 'xn--p1ai'.
+type ReverseDomainName string
+
+// Filter criteria to narrow search results. All specified filters combine with AND
+// logic.
+type SearchFilters struct {
+	// Filter by product categories (OR logic — matches products in any listed
+	// categories). Values match against the value field in product category entries.
+	// Valid values can be discovered from the categories field in search results,
+	// merchant documentation, or standard taxonomies that businesses may align with.
+	Categories []string `json:"categories,omitempty,omitzero"`
+
+	// Price corresponds to the JSON schema field "price".
+	Price *PriceFilter `json:"price,omitempty,omitzero"`
+
+	AdditionalProperties interface{} `mapstructure:",remain"`
+}
+
+// A specific option selection on a variant (e.g., Size: Large).
+type SelectedOption struct {
+	// Optional option value identifier from option_value.id. When present, the server
+	// SHOULD use it for matching; name and label remain required for display.
+	ID *string `json:"id,omitempty,omitzero"`
+
+	// Selected option label (e.g., 'Large').
+	Label string `json:"label"`
+
+	// Option name (e.g., 'Size').
+	Name string `json:"name"`
+}
+
+// A payment instrument with selection state.
+type SelectedPaymentInstrument interface{}
+
+type ServiceBase interface{}
+
+// Service binding in API responses. Includes per-resource transport configuration
+// via typed config.
+type ServiceResponseSchema interface{}
+
+// Shipping destination.
+type ShippingDestination struct {
+	// The country. Recommended to be in 2-letter ISO 3166-1 alpha-2 format, for
+	// example "US". For backward compatibility, a 3-letter ISO 3166-1 alpha-3 country
+	// code such as "SGP" or a full country name such as "Singapore" can also be used.
+	AddressCountry *string `json:"address_country,omitempty,omitzero"`
+
+	// The locality in which the street address is, and which is in the region. For
+	// example, Mountain View.
+	AddressLocality *string `json:"address_locality,omitempty,omitzero"`
+
+	// The region in which the locality is, and which is in the country. Required for
+	// applicable countries (i.e. state in US, province in CA). For example,
+	// California or another appropriate first-level Administrative division.
+	AddressRegion *string `json:"address_region,omitempty,omitzero"`
+
+	// An address extension such as an apartment number, C/O or alternative name.
+	ExtendedAddress *string `json:"extended_address,omitempty,omitzero"`
+
+	// Optional. First name of the contact associated with the address.
+	FirstName *string `json:"first_name,omitempty,omitzero"`
+
+	// ID specific to this shipping destination.
+	ID string `json:"id"`
+
+	// Optional. Last name of the contact associated with the address.
+	LastName *string `json:"last_name,omitempty,omitzero"`
+
+	// Optional. Phone number of the contact associated with the address.
+	PhoneNumber *string `json:"phone_number,omitempty,omitzero"`
+
+	// The postal code. For example, 94043.
+	PostalCode *string `json:"postal_code,omitempty,omitzero"`
+
+	// The street address.
+	StreetAddress *string `json:"street_address,omitempty,omitzero"`
+
+	// Destination type discriminator.
+	Type string `json:"type"`
+}
+
+// Environment data provided by the platform to support authorization and abuse
+// prevention. Values MUST NOT be buyer-asserted claims — platforms provide signals
+// based on direct observation or independently verifiable third-party
+// attestations. All signal keys MUST use reverse-domain naming to ensure
+// provenance and prevent collisions when multiple extensions contribute to the
+// shared namespace.
+type Signals struct {
+	// Client's IP address (IPv4 or IPv6).
+	DevUcpBuyerIp *string `json:"dev.ucp.buyer_ip,omitempty,omitzero"`
+
+	// Client's HTTP User-Agent header or equivalent.
+	DevUcpUserAgent *string `json:"dev.ucp.user_agent,omitempty,omitzero"`
+
+	AdditionalProperties interface{} `mapstructure:",remain"`
+}
+
+// Monetary amount in the currency's minor unit as defined by ISO 4217. Refer to
+// the currency's exponent to determine minor-to-major ratio (e.g., 2 for USD, 0
+// for JPY, 3 for KWD). May be negative — the sign is intrinsic to the value (e.g.,
+// discounts are negative, charges are positive).
+type SignedAmount int
+
+// Reusable opening and closing time fields for a containing schedule schema.
+// Containing schemas determine whether the `opens` and `closes` pair is required;
+// this fragment's standalone `{}` is not an interval.
+type TimeInterval struct {
+	// Closing time in 24-hour HH:MM format.
+	Closes *string `json:"closes,omitempty,omitzero"`
+
+	// Opening time in 24-hour HH:MM format.
+	Opens *string `json:"opens,omitempty,omitzero"`
+}
+
+// Base token credential schema. Concrete payment handlers may extend this schema
+// with additional fields and define their own constraints.
+type TokenCredential interface{}
+
+// A cost breakdown entry with a category, amount, and optional display text.
+type Total interface{}
+
+// Pricing breakdown provided by the business. MUST contain exactly one subtotal
+// and one total entry. Detail types (tax, fee, discount, fulfillment) may appear
+// multiple times for itemization. Platforms MUST render all entries in order using
+// display_text and amount.
+type Totals []interface{}
+
+// Base UCP metadata with shared properties for all schema types.
+type UcpBase struct {
+	// Capability registry keyed by reverse-domain name.
+	Capabilities UcpBaseCapabilities `json:"capabilities,omitempty,omitzero"`
+
+	// Preferred key-traversal order for sibling registry fields inside the root `ucp`
+	// envelope (`services`, `capabilities`, and `payment_handlers`).
+	MapOrder UcpMapOrder `json:"map_order,omitempty,omitzero"`
+
+	// Payment handler registry keyed by reverse-domain name.
+	PaymentHandlers UcpBasePaymentHandlers `json:"payment_handlers,omitempty,omitzero"`
+
+	// Service registry keyed by reverse-domain name.
+	Services UcpBaseServices `json:"services,omitempty,omitzero"`
+
+	// Application-level status of the UCP operation.
+	Status UcpBaseStatus `json:"status,omitempty,omitzero"`
+
+	// Version corresponds to the JSON schema field "version".
+	Version UcpVersion `json:"version"`
+}
+
+// Capability registry keyed by reverse-domain name.
+type UcpBaseCapabilities map[string][]CapabilityBase
+
+// Payment handler registry keyed by reverse-domain name.
+type UcpBasePaymentHandlers map[string][]PaymentHandlerBase
+
+// Service registry keyed by reverse-domain name.
+type UcpBaseServices map[string][]ServiceBase
+
+type UcpBaseStatus string
+
+const UcpBaseStatusError UcpBaseStatus = "error"
+const UcpBaseStatusSuccess UcpBaseStatus = "success"
+
+// UCP metadata for cart responses. No payment handlers needed pre-checkout.
+type UcpCartResponseSchema interface{}
 
 // UCP metadata for checkout responses.
-type ResponseCheckout struct {
-	// Active capabilities for this response.
-	Capabilities []ResponseCheckoutCapabilitiesElem `json:"capabilities"`
+type UcpCheckoutResponseSchema interface{}
 
-	// Version corresponds to the JSON schema field "version".
-	Version Version `json:"version"`
+// Shared foundation for all UCP entities.
+type UcpEntity struct {
+	// Entity-specific configuration. Structure defined by each entity's schema.
+	Config UcpEntityConfig `json:"config,omitempty,omitzero"`
+
+	// Unique identifier for this entity instance. Used to disambiguate when multiple
+	// instances exist.
+	ID *string `json:"id,omitempty,omitzero"`
+
+	// URL to JSON Schema defining this entity's structure and payloads.
+	Schema *string `json:"schema,omitempty,omitzero"`
+
+	// URL to human-readable specification document.
+	Spec *string `json:"spec,omitempty,omitzero"`
+
+	// Entity version in YYYY-MM-DD format.
+	Version UcpVersion `json:"version"`
 }
 
-type ResponseCheckoutCapabilitiesElem interface{}
+// Entity-specific configuration. Structure defined by each entity's schema.
+type UcpEntityConfig map[string]interface{}
+
+// UCP metadata with status 'error'. Use for response branches that carry error
+// information.
+type UcpError interface{}
+
+// Preferred key order for map-valued fields in the scope annotated by the
+// containing `ucp` member. Each property names a target map, and its array lists
+// target keys in preferred order. Lists may be partial and are not allowlists.
+type UcpMapOrder map[string][]string
 
 // UCP metadata for order responses. No payment handlers needed post-purchase.
-type ResponseOrder struct {
-	// Active capabilities for this response.
-	Capabilities []ResponseOrderCapabilitiesElem `json:"capabilities"`
+type UcpOrderResponseSchema interface{}
 
-	// Version corresponds to the JSON schema field "version".
-	Version Version `json:"version"`
+// UCP metadata with status 'success'. Use for response branches that carry the
+// expected payload.
+type UcpSuccess interface{}
+
+// Version identifier in YYYY-MM-DD format.
+type UcpVersion string
+
+// A reusable unit descriptor for quantities and measures. Its unit-descriptor
+// machine identity is (`unit`, effective `scale`), where effective `scale` is the
+// provided `scale` or 0; `display_text` is excluded.
+type Unit interface{}
+
+// Price per standard unit of measurement. MAY be omitted when unit pricing does
+// not apply. `unit_price.currency` MUST equal `price.currency`; the comparator
+// MUST NOT perform currency conversion. `measure.unit` and `reference.unit` MUST
+// be identical; cross-unit conversion is not permitted. Their scales MAY differ;
+// each value represents `value × 10^-scale`.
+type UnitPrice struct {
+	// Unit price in ISO 4217 minor units. After satisfying the same-unit invariant,
+	// the Business MUST compute the comparator as `(price.amount / (measure.value ×
+	// 10^-measure.scale)) × (reference.value × 10^-reference.scale)` and round it
+	// once to ISO 4217 minor units according to its pricing rules. The returned
+	// `unit_price.amount` is authoritative; the Platform MUST NOT recompute or
+	// substitute its own result.
+	Amount Amount `json:"amount"`
+
+	// ISO 4217 currency code.
+	Currency string `json:"currency"`
+
+	// Product quantity in packaging/content (for example, a 750 mL bottle), distinct
+	// from `quantity_unit`, which defines the sale basis. Its integer `value` MUST be
+	// at least 1.
+	Measure UnitPriceMeasure `json:"measure"`
+
+	// Denominator for unit price display (for example, per 100 mL or per 1 kg). Its
+	// integer `value` MUST be at least 1.
+	Reference UnitPriceReference `json:"reference"`
 }
 
-type ResponseOrderCapabilitiesElem interface{}
-
-// A pickup location (retail store, locker, etc.).
-type RetailLocationRequest struct {
-	// Physical address of the location.
-	Address *PostalAddress `json:"address,omitempty"`
-
-	// Location name (e.g., store name).
-	Name string `json:"name"`
-
-	AdditionalProperties interface{} `mapstructure:",remain"`
+// Product quantity in packaging/content (for example, a 750 mL bottle), distinct
+// from `quantity_unit`, which defines the sale basis. Its integer `value` MUST be
+// at least 1.
+type UnitPriceMeasure struct {
+	// Value corresponds to the JSON schema field "value".
+	Value interface{} `json:"value,omitempty,omitzero"`
 }
 
-// A pickup location (retail store, locker, etc.).
-type RetailLocationResponse struct {
-	// Physical address of the location.
-	Address *PostalAddress `json:"address,omitempty"`
+// Denominator for unit price display (for example, per 100 mL or per 1 kg). Its
+// integer `value` MUST be at least 1.
+type UnitPriceReference struct {
+	// Value corresponds to the JSON schema field "value".
+	Value interface{} `json:"value,omitempty,omitzero"`
+}
 
-	// Unique location identifier.
+// A purchasable variant of a product with specific option selections.
+type Variant struct {
+	// Variant availability for purchase.
+	Availability *Availability `json:"availability,omitempty,omitzero"`
+
+	// Industry-standard product identifiers for cross-reference and correlation.
+	Barcodes []VariantBarcodesElem `json:"barcodes,omitempty,omitzero"`
+
+	// Variant categories with optional taxonomy identifiers.
+	Categories []Category `json:"categories,omitempty,omitzero"`
+
+	// Variant description in one or more formats.
+	Description Description `json:"description"`
+
+	// URL-safe variant handle/slug.
+	Handle *string `json:"handle,omitempty,omitzero"`
+
+	// Global ID (GID) uniquely identifying this variant. Used as item.id in checkout.
 	ID string `json:"id"`
 
-	// Location name (e.g., store name).
-	Name string `json:"name"`
+	// List price before discounts (for strikethrough display).
+	ListPrice *Price `json:"list_price,omitempty,omitzero"`
 
-	AdditionalProperties interface{} `mapstructure:",remain"`
+	// Variant media (images, videos, 3D models). First item is the featured media for
+	// listings.
+	Media []Media `json:"media,omitempty,omitzero"`
+
+	// Business-defined custom data extending the standard variant model.
+	Metadata VariantMetadata `json:"metadata,omitempty,omitzero"`
+
+	// Option values that define this variant (e.g., Color: Blue, Size: Large).
+	Options []SelectedOption `json:"options,omitempty,omitzero"`
+
+	// Current selling price. Price is the amount per one whole `quantity_unit.unit`
+	// (for example, per lb or per hour); when `quantity_unit` is absent, it is per
+	// `each`. Line total is `price × quantity × 10^-scale`, computed and rounded once
+	// by the Business; `totals` remain authoritative.
+	Price Price `json:"price"`
+
+	// Sale basis this variant's `quantity` is denominated in. The default sale basis
+	// is `each`, whose machine identity is (`C62`, 0); `C62` is the UN/CEFACT Rec20
+	// code for one/each. An absent catalog descriptor encodes that default. An
+	// `increment` advertises the ordering granularity in steps (for example, `scale`
+	// 2 with `increment` 25 sells in 0.25-unit multiples).
+	QuantityUnit QuantityUnit `json:"quantity_unit,omitempty,omitzero"`
+
+	// Variant rating.
+	Rating *Rating `json:"rating,omitempty,omitzero"`
+
+	// Optional seller context for this variant.
+	Seller *VariantSeller `json:"seller,omitempty,omitzero"`
+
+	// Business-assigned identifier for inventory and fulfillment.
+	Sku *string `json:"sku,omitempty,omitzero"`
+
+	// Variant tags for categorization and search.
+	Tags []string `json:"tags,omitempty,omitzero"`
+
+	// Variant display title (e.g., 'Blue / Large').
+	Title string `json:"title"`
+
+	// Price per standard unit of measurement, for shelf-style comparison display. MAY
+	// be omitted when unit pricing does not apply.
+	UnitPrice *UnitPrice `json:"unit_price,omitempty,omitzero"`
+
+	// Canonical variant page URL.
+	URL *string `json:"url,omitempty,omitzero"`
 }
 
-type ShippingDestinationRequest struct {
-	// The country. Recommended to be in 2-letter ISO 3166-1 alpha-2 format, for
-	// example "US". For backward compatibility, a 3-letter ISO 3166-1 alpha-3 country
-	// code such as "SGP" or a full country name such as "Singapore" can also be used.
-	AddressCountry *string `json:"address_country,omitempty"`
-
-	// The locality in which the street address is, and which is in the region. For
-	// example, Mountain View.
-	AddressLocality *string `json:"address_locality,omitempty"`
-
-	// The region in which the locality is, and which is in the country. Required for
-	// applicable countries (i.e. state in US, province in CA). For example,
-	// California or another appropriate first-level Administrative division.
-	AddressRegion *string `json:"address_region,omitempty"`
-
-	// An address extension such as an apartment number, C/O or alternative name.
-	ExtendedAddress *string `json:"extended_address,omitempty"`
-
-	// Optional. First name of the contact associated with the address.
-	FirstName *string `json:"first_name,omitempty"`
-
-	// Optional. Full name of the contact associated with the address (if first_name
-	// or last_name fields are present they take precedence).
-	FullName *string `json:"full_name,omitempty"`
-
-	// ID specific to this shipping destination.
-	ID *string `json:"id,omitempty"`
-
-	// Optional. Last name of the contact associated with the address.
-	LastName *string `json:"last_name,omitempty"`
-
-	// Optional. Phone number of the contact associated with the address.
-	PhoneNumber *string `json:"phone_number,omitempty"`
-
-	// The postal code. For example, 94043.
-	PostalCode *string `json:"postal_code,omitempty"`
-
-	// The street address.
-	StreetAddress *string `json:"street_address,omitempty"`
-}
-
-type ShippingDestinationResponse struct {
-	// The country. Recommended to be in 2-letter ISO 3166-1 alpha-2 format, for
-	// example "US". For backward compatibility, a 3-letter ISO 3166-1 alpha-3 country
-	// code such as "SGP" or a full country name such as "Singapore" can also be used.
-	AddressCountry *string `json:"address_country,omitempty"`
-
-	// The locality in which the street address is, and which is in the region. For
-	// example, Mountain View.
-	AddressLocality *string `json:"address_locality,omitempty"`
-
-	// The region in which the locality is, and which is in the country. Required for
-	// applicable countries (i.e. state in US, province in CA). For example,
-	// California or another appropriate first-level Administrative division.
-	AddressRegion *string `json:"address_region,omitempty"`
-
-	// An address extension such as an apartment number, C/O or alternative name.
-	ExtendedAddress *string `json:"extended_address,omitempty"`
-
-	// Optional. First name of the contact associated with the address.
-	FirstName *string `json:"first_name,omitempty"`
-
-	// Optional. Full name of the contact associated with the address (if first_name
-	// or last_name fields are present they take precedence).
-	FullName *string `json:"full_name,omitempty"`
-
-	// ID specific to this shipping destination.
-	ID string `json:"id"`
-
-	// Optional. Last name of the contact associated with the address.
-	LastName *string `json:"last_name,omitempty"`
-
-	// Optional. Phone number of the contact associated with the address.
-	PhoneNumber *string `json:"phone_number,omitempty"`
-
-	// The postal code. For example, 94043.
-	PostalCode *string `json:"postal_code,omitempty"`
-
-	// The street address.
-	StreetAddress *string `json:"street_address,omitempty"`
-}
-
-// Base token credential schema. Concrete payment handlers may extend this schema
-// with additional fields and define their own constraints.
-type TokenCredentialCreateRequest struct {
-	// The token value.
-	Token string `json:"token"`
-
-	// The specific type of token produced by the handler (e.g., 'stripe_token').
+type VariantBarcodesElem struct {
+	// Barcode standard. Well-known values: UPC, EAN, ISBN, GTIN, JAN.
 	Type string `json:"type"`
 
-	AdditionalProperties interface{} `mapstructure:",remain"`
+	// Barcode value.
+	Value string `json:"value"`
 }
 
-// Base token credential schema. Concrete payment handlers may extend this schema
-// with additional fields and define their own constraints.
-type TokenCredentialResponse struct {
-	// The specific type of token produced by the handler (e.g., 'stripe_token').
-	Type string `json:"type"`
+// Business-defined custom data extending the standard variant model.
+type VariantMetadata map[string]interface{}
 
-	AdditionalProperties interface{} `mapstructure:",remain"`
+// Optional seller context for this variant.
+type VariantSeller struct {
+	// Seller policy and information links.
+	Links []Link `json:"links,omitempty,omitzero"`
+
+	// Seller display name.
+	Name *string `json:"name,omitempty,omitzero"`
 }
 
-// Base token credential schema. Concrete payment handlers may extend this schema
-// with additional fields and define their own constraints.
-type TokenCredentialUpdateRequest struct {
-	// The token value.
-	Token string `json:"token"`
-
-	// The specific type of token produced by the handler (e.g., 'stripe_token').
-	Type string `json:"type"`
-
-	AdditionalProperties interface{} `mapstructure:",remain"`
-}
-
-type TotalResponse struct {
-	// If type == total, sums subtotal - discount + fulfillment + tax + fee. Should be
-	// >= 0. Amount in minor (cents) currency units.
-	Amount int `json:"amount"`
-
-	// Text to display against the amount. Should reflect appropriate method (e.g.,
-	// 'Shipping', 'Delivery').
-	DisplayText *string `json:"display_text,omitempty"`
-
-	// Type of total categorization.
-	Type TotalResponseType `json:"type"`
-}
-
-type TotalResponseType string
-
-const TotalResponseTypeDiscount TotalResponseType = "discount"
-const TotalResponseTypeFee TotalResponseType = "fee"
-const TotalResponseTypeFulfillment TotalResponseType = "fulfillment"
-const TotalResponseTypeItemsDiscount TotalResponseType = "items_discount"
-const TotalResponseTypeSubtotal TotalResponseType = "subtotal"
-const TotalResponseTypeTax TotalResponseType = "tax"
-const TotalResponseTypeTotal TotalResponseType = "total"
-
-// Schema for UCP service definitions. A service defines the API surface for a
-// vertical (shopping, common, etc.) with transport bindings.
-type UCPService struct {
-	// A2A transport binding
-	A2A *UCPServiceA2A `json:"a2a,omitempty"`
-
-	// Embedded transport binding (JSON-RPC 2.0 over postMessage). Unlike REST/MCP,
-	// the endpoint is per-capability (i.e. per-checkout via continue_url), not
-	// per-service.
-	Embedded *UCPServiceEmbedded `json:"embedded,omitempty"`
-
-	// MCP transport binding
-	Mcp *UCPServiceMcp `json:"mcp,omitempty"`
-
-	// REST transport binding
-	Rest *UCPServiceRest `json:"rest,omitempty"`
-
-	// URL to service documentation. Origin MUST match namespace authority.
-	Spec string `json:"spec"`
-
-	// Service version in YYYY-MM-DD format.
-	Version Version `json:"version"`
-
-	AdditionalProperties interface{} `mapstructure:",remain"`
-}
-
-// A2A transport binding
-type UCPServiceA2A struct {
-	// Merchant's Agent Card endpoint
-	Endpoint string `json:"endpoint"`
-}
-
-// Embedded transport binding (JSON-RPC 2.0 over postMessage). Unlike REST/MCP, the
-// endpoint is per-capability (i.e. per-checkout via continue_url), not
-// per-service.
-type UCPServiceEmbedded struct {
-	// URL to OpenRPC specification (JSON format) defining the embedded protocol
-	Schema string `json:"schema"`
-}
-
-// MCP transport binding
-type UCPServiceMcp struct {
-	// Merchant's MCP endpoint
-	Endpoint string `json:"endpoint"`
-
-	// URL to OpenRPC specification (JSON format)
-	Schema string `json:"schema"`
-}
-
-// REST transport binding
-type UCPServiceRest struct {
-	// Merchant's REST API endpoint
-	Endpoint string `json:"endpoint"`
-
-	// URL to OpenAPI 3.x specification (JSON format)
-	Schema string `json:"schema"`
-}
-
-// UCP protocol version in YYYY-MM-DD format.
-type Version string
+// Warning code identifying the type of warning. Standard codes are defined in
+// capability specifications (see examples) and have standardized semantics;
+// freeform codes are permitted.
+type WarningCode string

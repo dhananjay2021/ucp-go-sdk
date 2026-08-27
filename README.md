@@ -28,6 +28,9 @@ This repository contains the Go SDK for the
 [Universal Commerce Protocol (UCP)](https://ucp.dev). It provides Go types,
 validation, and client/server utilities for building UCP-compliant applications.
 
+**UCP spec compatibility:** this SDK targets the **2026-08-25** UCP release. The
+targeted release is available programmatically as `models.SpecVersion`.
+
 ## Features
 
 - **Models**: Go structs for all UCP schemas (catalog, cart, checkout, order, payment, fulfillment, etc.)

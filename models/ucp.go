@@ -299,11 +299,30 @@ type UCPProfile struct {
 	// Payment contains payment configuration.
 	Payment *PaymentConfig `json:"payment,omitempty"`
 
+	// Keys is the canonical UCP profile field for publishing signing keys, as a
+	// JWK Set per RFC 7517. When a profile publishes signing keys, they MUST appear
+	// here; this is where every UCP verifier reads them. Introduced by UCP spec
+	// change #566 (promote keys[] to canonical profile signing key field).
+	Keys []JWK `json:"keys,omitempty"`
+
 	// SigningKeys are public keys for signature verification.
+	//
+	// Deprecated: use Keys, the canonical profile signing key field as of the
+	// 2026-08-25 UCP release. SigningKeys is retained for backward compatibility.
 	SigningKeys []JWK `json:"signing_keys,omitempty"`
 
 	// AdditionalProperties captures any extra fields.
 	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// VerificationKeys returns the profile's signing keys, preferring the canonical
+// keys[] field and falling back to the deprecated signing_keys field for
+// profiles published before the 2026-08-25 UCP release.
+func (p UCPProfile) VerificationKeys() []JWK {
+	if len(p.Keys) > 0 {
+		return p.Keys
+	}
+	return p.SigningKeys
 }
 
 // PaymentConfig represents payment configuration in the discovery profile.

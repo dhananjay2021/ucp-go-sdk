@@ -44,6 +44,14 @@ const (
 
 	// CartsPath is the shopping carts endpoint.
 	CartsPath = "/carts"
+
+	// LocationSearchPath is the location search endpoint
+	// (dev.ucp.common.location.search).
+	LocationSearchPath = "/locations/search"
+
+	// LocationLookupPath is the location lookup endpoint
+	// (dev.ucp.common.location.lookup).
+	LocationLookupPath = "/locations/lookup"
 )
 
 // ClientOption is a function that configures a Client.
@@ -336,6 +344,27 @@ func (c *Client) DeleteCart(ctx context.Context, id string) error {
 		return err
 	}
 	return nil
+}
+
+// SearchLocations searches a business's physical locations
+// (dev.ucp.common.location.search). Predicates such as distance, serves, and
+// filters combine with AND.
+func (c *Client) SearchLocations(ctx context.Context, req *models.LocationSearchRequest) (*models.LocationSearchResponse, error) {
+	var resp models.LocationSearchResponse
+	if err := c.doRequest(ctx, http.MethodPost, LocationSearchPath, req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// LookupLocations resolves one or more location identifiers to full Location
+// records (dev.ucp.common.location.lookup).
+func (c *Client) LookupLocations(ctx context.Context, req *models.LocationLookupRequest) (*models.LocationLookupResponse, error) {
+	var resp models.LocationLookupResponse
+	if err := c.doRequest(ctx, http.MethodPost, LocationLookupPath, req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }
 
 // CreateCheckoutFromCart creates a checkout session from an existing cart.
