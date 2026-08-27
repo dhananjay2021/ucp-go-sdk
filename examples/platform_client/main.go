@@ -62,6 +62,23 @@ func main() {
 		fmt.Printf("  - %s (v%s)\n", cap.Name, cap.Version)
 	}
 
+	// UCP 2026-08-25: signing keys are published under the canonical keys[]
+	// field. VerificationKeys() prefers keys[] and falls back to the deprecated
+	// signing_keys for older profiles.
+	if keys := profile.VerificationKeys(); len(keys) > 0 {
+		fmt.Printf("Signing keys (keys[]):\n")
+		for _, k := range keys {
+			fmt.Printf("  - kid=%s kty=%s alg=%s use=%s\n", k.Kid, k.Kty, k.Alg, k.Use)
+		}
+	}
+
+	// Permalink capability: read the business browser endpoint from its config.
+	if permalink := client.GetCapability(profile, client.CapabilityPermalink); permalink != nil {
+		if ep, ok := permalink.Config["endpoint"].(string); ok {
+			fmt.Printf("Permalink endpoint: %s\n", ep)
+		}
+	}
+
 	// Check for required capabilities
 	if !client.HasCapability(profile, client.CapabilityCheckout) {
 		log.Fatal("Merchant does not support checkout capability")
@@ -159,6 +176,29 @@ func main() {
 		fmt.Printf("  %s: %d (cents)\n", total.Type, total.Amount)
 	}
 
+	// New 2026-08-25 capabilities surfaced on the checkout response.
+	if len(checkout.Policies) > 0 {
+		fmt.Println("Policies:")
+		for _, p := range checkout.Policies {
+			fmt.Printf("  - [%s] %s\n", p.Type, p.Description.Plain)
+		}
+	}
+	if len(checkout.PaymentTerms) > 0 {
+		fmt.Println("Payment terms:")
+		for _, term := range checkout.PaymentTerms {
+			fmt.Printf("  - %s (%s): %d schedule(s)\n", term.Title, term.ID, len(term.Schedules))
+		}
+	}
+	for claim, mem := range checkout.Loyalty {
+		fmt.Printf("Loyalty [%s]: %s", claim, mem.Name)
+		for _, rw := range mem.Rewards {
+			if rw.EarningForecast != nil {
+				fmt.Printf(" — earn %d %s", int(rw.EarningForecast.Amount), rw.Currency.Code)
+			}
+		}
+		fmt.Println()
+	}
+
 	// Step 3: Update checkout with buyer information
 	fmt.Println("\n=== Step 3: Updating checkout with buyer info ===")
 	checkout, err = ucpClient.UpdateCheckout(ctx, checkout.ID, &extensions.ExtendedCheckoutUpdateRequest{
@@ -230,6 +270,14 @@ func main() {
 
 	fmt.Printf("Status after payment: %s\n", checkout.Status)
 
+	// Payment Authentication extension: the business may return outstanding
+	// Actions (e.g. a 3DS challenge) the platform must run before completion.
+	if challenges, ok := checkout.Actions[models.ActionTypeThreeDSChallenge]; ok {
+		for _, a := range challenges {
+			fmt.Printf("Action required: 3DS challenge (id=%s) at %v\n", a.ID, a.Config["url"])
+		}
+	}
+
 	// Step 5: Complete the checkout
 	if checkout.Status == models.CheckoutStatusReadyForComplete {
 		fmt.Println("\n=== Step 5: Completing checkout ===")
@@ -263,6 +311,49 @@ func main() {
 			log.Printf("Failed to get order: %v", err)
 		} else {
 			fmt.Printf("Order items: %d\n", len(order.LineItems))
+			if order.Label != "" {
+				fmt.Printf("Order label: %s\n", order.Label)
+			}
+			for _, p := range order.Policies {
+				fmt.Printf("Order policy: [%s] %s\n", p.Type, p.Description.Plain)
+			}
+		}
+	}
+
+	// Step 7: Location capability — search and look up physical stores.
+	if client.HasCapability(profile, client.CapabilityLocationSearch) {
+		fmt.Println("\n=== Step 7: Location search + lookup ===")
+		near := "stores near Mountain View"
+		searchResp, err := ucpClient.SearchLocations(ctx, &models.LocationSearchRequest{
+			Query: &near,
+			Filters: &models.LocationFilter{
+				Amenities: []string{"dev.ucp.amenity.curbside_pickup"},
+			},
+		})
+		if err != nil {
+			log.Printf("Location search failed: %v", err)
+		} else {
+			fmt.Printf("Found %d locations:\n", len(searchResp.Locations))
+			var ids []string
+			for _, loc := range searchResp.Locations {
+				city := ""
+				if loc.Address != nil {
+					city = loc.Address.AddressLocality
+				}
+				fmt.Printf("  - %s (%s) [%s]\n", loc.Name, city, loc.ID)
+				ids = append(ids, loc.ID)
+			}
+
+			if len(ids) > 0 {
+				lookupResp, err := ucpClient.LookupLocations(ctx, &models.LocationLookupRequest{IDs: ids[:1]})
+				if err != nil {
+					log.Printf("Location lookup failed: %v", err)
+				} else if len(lookupResp.Locations) > 0 {
+					loc := lookupResp.Locations[0]
+					fmt.Printf("Looked up %s: %d amenities, %d weekly hours\n",
+						loc.ID, len(loc.Amenities), len(loc.Hours))
+				}
+			}
 		}
 	}
 
